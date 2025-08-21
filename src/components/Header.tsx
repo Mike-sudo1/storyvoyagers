@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { BookOpen, User, Search, Home, Compass, Library, Sparkles } from "lucide-react";
 
@@ -19,18 +20,18 @@ const Header = () => {
 
         {/* Navigation - Hidden on mobile */}
         <nav className="hidden md:flex items-center space-x-6">
-          <a href="#" className="flex items-center space-x-2 text-foreground hover:text-primary transition-smooth">
+          <Link to="/" className="flex items-center space-x-2 text-foreground hover:text-primary transition-smooth">
             <Home className="h-4 w-4" />
             <span className="font-medium">Home</span>
-          </a>
-          <a href="#" className="flex items-center space-x-2 text-foreground hover:text-primary transition-smooth">
+          </Link>
+          <Link to="/explore" className="flex items-center space-x-2 text-foreground hover:text-primary transition-smooth">
             <Compass className="h-4 w-4" />
             <span className="font-medium">Explore</span>
-          </a>
-          <a href="#" className="flex items-center space-x-2 text-foreground hover:text-primary transition-smooth">
+          </Link>
+          <Link to="/my-library" className="flex items-center space-x-2 text-foreground hover:text-primary transition-smooth">
             <Library className="h-4 w-4" />
             <span className="font-medium">My Library</span>
-          </a>
+          </Link>
         </nav>
 
         {/* Actions */}
@@ -38,14 +39,18 @@ const Header = () => {
           <Button variant="ghost" size="icon" className="hidden sm:flex">
             <Search className="h-4 w-4" />
           </Button>
-          <Button variant="outline">
-            <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Sign In</span>
-          </Button>
-          <Button variant="hero">
-            <Sparkles className="h-4 w-4" />
-            <span className="hidden sm:inline">Get Started</span>
-          </Button>
+          <Link to="/signin">
+            <Button variant="outline">
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign In</span>
+            </Button>
+          </Link>
+          <Link to="/create-story">
+            <Button variant="hero">
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Get Started</span>
+            </Button>
+          </Link>
         </div>
       </div>
     </header>
