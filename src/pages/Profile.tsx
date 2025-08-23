@@ -1,13 +1,19 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ChildProfileCard from "@/components/ChildProfileCard";
+import ChildProfileForm from "@/components/ChildProfileForm";
+import AvatarUpload from "@/components/AvatarUpload";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/hooks/useAuth";
+import { useChildren, useDeleteChild } from "@/hooks/useChildren";
+import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { toast } from "sonner";
 import { 
   User, 
   Settings, 
@@ -21,16 +27,67 @@ import {
   Camera,
   Plus,
   Edit,
-  Trash2
+  Trash2,
+  Loader2
 } from "lucide-react";
-
-const sampleChildren = [
-  { name: "Emma", age: 7, avatarUrl: undefined, storiesCompleted: 12, badges: 8 },
-  { name: "Alex", age: 5, avatarUrl: undefined, storiesCompleted: 6, badges: 4 }
-];
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState("children");
+  const [showChildForm, setShowChildForm] = useState(false);
+  const [showAvatarUpload, setShowAvatarUpload] = useState(false);
+  const [selectedChild, setSelectedChild] = useState<any>(null);
+  const [isEditingChild, setIsEditingChild] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  
+  const { user } = useAuth();
+  const { data: children = [], isLoading: childrenLoading } = useChildren();
+  const { data: profile = {}, isLoading: profileLoading } = useProfile();
+  const updateProfileMutation = useUpdateProfile();
+  const deleteChildMutation = useDeleteChild();
+
+  // Update profile name when profile data loads
+  React.useEffect(() => {
+    setProfileName(profile.full_name || '');
+  }, [profile.full_name]);
+
+  const handleAddChild = () => {
+    setSelectedChild(null);
+    setIsEditingChild(false);
+    setShowChildForm(true);
+  };
+
+  const handleEditChild = (child: any) => {
+    setSelectedChild(child);
+    setIsEditingChild(true);
+    setShowChildForm(true);
+  };
+
+  const handleDeleteChild = async (childId: string) => {
+    if (window.confirm("Are you sure you want to delete this child profile?")) {
+      deleteChildMutation.mutate(childId);
+    }
+  };
+
+  const handleUploadAvatar = (child: any) => {
+    setSelectedChild(child);
+    setShowAvatarUpload(true);
+  };
+
+  const handleSettingChange = (setting: string, value: any) => {
+    updateProfileMutation.mutate({ [setting]: value });
+  };
+
+  if (childrenLoading || profileLoading) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -61,8 +118,8 @@ const Profile = () => {
                   <div className="p-4 bg-primary/10 rounded-full w-fit mx-auto">
                     <User className="h-8 w-8 text-primary" />
                   </div>
-                  <h3 className="font-fredoka font-semibold text-lg">Sarah Johnson</h3>
-                  <p className="text-sm text-muted-foreground">sarah.johnson@email.com</p>
+                  <h3 className="font-fredoka font-semibold text-lg">{profile?.full_name || user?.email || 'User'}</h3>
+                  <p className="text-sm text-muted-foreground">{user?.email}</p>
                   <Badge className="bg-gradient-adventure text-white border-0 font-fredoka">
                     <Crown className="h-3 w-3 mr-1" />
                     Premium Family
@@ -73,11 +130,11 @@ const Profile = () => {
                   <h4 className="font-fredoka font-semibold text-lg">Family Stats</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <div className="font-fredoka font-bold text-2xl text-primary">2</div>
+                      <div className="font-fredoka font-bold text-2xl text-primary">{children.length}</div>
                       <div className="text-xs text-muted-foreground">Children</div>
                     </div>
                     <div>
-                      <div className="font-fredoka font-bold text-2xl text-secondary">18</div>
+                      <div className="font-fredoka font-bold text-2xl text-secondary">{children.reduce((acc, child) => acc + (child.stories_completed || 0), 0)}</div>
                       <div className="text-xs text-muted-foreground">Stories Read</div>
                     </div>
                   </div>
@@ -126,25 +183,48 @@ const Profile = () => {
             <TabsContent value="children" className="space-y-8">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-fredoka font-bold">Child Profiles</h2>
-                <Button variant="hero">
+                <Button variant="hero" onClick={handleAddChild}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Child Profile
                 </Button>
               </div>
 
               <div className="grid md:grid-cols-3 gap-6">
-                {sampleChildren.map((child, index) => (
-                  <div key={index} className="relative group">
-                    <ChildProfileCard {...child} />
+                {children.map((child: any) => (
+                  <div key={child.id} className="relative group">
+                    <ChildProfileCard 
+                      name={child.name}
+                      age={child.age}
+                      avatarUrl={child.avatar_url}
+                      storiesCompleted={child.stories_completed || 0}
+                      badges={child.badges || 0}
+                    />
                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-smooth">
                       <div className="flex space-x-2">
-                        <Button size="icon" variant="secondary" className="h-8 w-8">
+                        <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => handleEditChild(child)}>
                           <Edit className="h-3 w-3" />
                         </Button>
-                        <Button size="icon" variant="destructive" className="h-8 w-8">
+                        <Button 
+                          size="icon" 
+                          variant="destructive" 
+                          className="h-8 w-8"
+                          onClick={() => handleDeleteChild(child.id)}
+                          disabled={deleteChildMutation.isPending}
+                        >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
+                    </div>
+                    {/* Avatar upload button */}
+                    <div className="absolute bottom-4 left-4">
+                      <Button 
+                        size="icon" 
+                        variant="outline" 
+                        className="h-8 w-8 bg-white/90"
+                        onClick={() => handleUploadAvatar(child)}
+                      >
+                        <Camera className="h-3 w-3" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -203,17 +283,47 @@ const Profile = () => {
                     <div className="space-y-2">
                       <Label>Default Language</Label>
                       <div className="grid grid-cols-3 gap-2">
-                        <Button variant="hero" size="sm">English</Button>
-                        <Button variant="outline" size="sm">Spanish</Button>
-                        <Button variant="outline" size="sm">Bilingual</Button>
+                        <Button 
+                          variant={profile.language_preference === 'en' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('language_preference', 'en')}
+                        >
+                          English
+                        </Button>
+                        <Button 
+                          variant={profile.language_preference === 'es' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('language_preference', 'es')}
+                        >
+                          Spanish
+                        </Button>
+                        <Button 
+                          variant={profile.language_preference === 'bilingual' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('language_preference', 'bilingual')}
+                        >
+                          Bilingual
+                        </Button>
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <Label>Font Preference</Label>
                       <div className="grid grid-cols-2 gap-2">
-                        <Button variant="hero" size="sm">Regular Font</Button>
-                        <Button variant="outline" size="sm">Dyslexia-Friendly</Button>
+                        <Button 
+                          variant={profile.font_preference === 'regular' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('font_preference', 'regular')}
+                        >
+                          Regular Font
+                        </Button>
+                        <Button 
+                          variant={profile.font_preference === 'dyslexia' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('font_preference', 'dyslexia')}
+                        >
+                          Dyslexia-Friendly
+                        </Button>
                       </div>
                     </div>
 
@@ -268,16 +378,30 @@ const Profile = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Email Address</Label>
-                      <Input value="sarah.johnson@email.com" />
+                      <Label>Account Information</Label>
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label>Email Address</Label>
+                          <Input value={user?.email || ''} disabled />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Display Name</Label>
+                          <Input 
+                            value={profile.full_name || ''} 
+                            onChange={(e) => setProfileName(e.target.value)}
+                            placeholder="Enter your full name"
+                          />
+                        </div>
+                        <Button 
+                          variant="adventure" 
+                          size="sm"
+                          onClick={() => handleSettingChange('full_name', profileName)}
+                          disabled={updateProfileMutation.isPending}
+                        >
+                          {updateProfileMutation.isPending ? 'Updating...' : 'Update Profile'}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Display Name</Label>
-                      <Input value="Sarah Johnson" />
-                    </div>
-                    <Button variant="adventure" size="sm">
-                      Update Profile
-                    </Button>
                   </CardContent>
                 </Card>
 
@@ -485,6 +609,21 @@ const Profile = () => {
           </Tabs>
         </div>
       </section>
+
+      {/* Modals */}
+      <ChildProfileForm 
+        open={showChildForm}
+        onOpenChange={setShowChildForm}
+        child={selectedChild}
+        isEditing={isEditingChild}
+      />
+      
+      <AvatarUpload 
+        open={showAvatarUpload}
+        onOpenChange={setShowAvatarUpload}
+        childId={selectedChild?.id || ''}
+        childName={selectedChild?.name || ''}
+      />
 
       <Footer />
     </div>

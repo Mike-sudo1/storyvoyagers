@@ -6,7 +6,9 @@ import StoryPreview from "@/components/StoryPreview";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { BookOpen, Clock, Heart, TrendingUp } from "lucide-react";
+import { useStories, useSaveStory } from "@/hooks/useStories";
+import { useAuth } from "@/hooks/useAuth";
+import { BookOpen, Clock, Heart, TrendingUp, Loader2, Play, Users, Bookmark } from "lucide-react";
 
 const recommendedStories = [
   {
@@ -57,16 +59,34 @@ const recommendedStories = [
 
 const Home = () => {
   const [savedStories, setSavedStories] = useState<Set<string>>(new Set());
+  const { user } = useAuth();
+  const { data: stories = [], isLoading } = useStories();
+  const saveStoryMutation = useSaveStory();
+
+  const handleSaveStory = (storyId: string) => {
+    saveStoryMutation.mutate(storyId);
+    setSavedStories(prev => new Set([...prev, storyId]));
+  };
 
   const toggleSaveStory = (title: string) => {
-    const newSaved = new Set(savedStories);
-    if (newSaved.has(title)) {
-      newSaved.delete(title);
-    } else {
-      newSaved.add(title);
+    // Find story by title and save by ID
+    const story = stories.find(s => s.title === title);
+    if (story) {
+      handleSaveStory(story.id);
     }
-    setSavedStories(newSaved);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -138,25 +158,63 @@ const Home = () => {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-8">
-            {recommendedStories.map((story, index) => (
-              <div key={index} className="relative group">
-                <StoryPreview 
-                  {...story} 
-                  onSave={() => toggleSaveStory(story.title)}
-                  isSaved={savedStories.has(story.title)}
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all duration-300 rounded-xl pointer-events-none" />
-                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <Button
-                    size="sm"
-                    variant={savedStories.has(story.title) ? "default" : "outline"}
-                    onClick={() => toggleSaveStory(story.title)}
-                    className="font-fredoka"
-                  >
-                    <Heart className={`h-4 w-4 ${savedStories.has(story.title) ? 'fill-current' : ''}`} />
-                  </Button>
-                </div>
-              </div>
+            {stories.slice(0, 4).map((story) => (
+              <Card key={story.id} className="bg-gradient-card border-0 shadow-soft hover:shadow-card transition-shadow group">
+                <CardContent className="p-6">
+                  <div className="aspect-video bg-gradient-cosmic rounded-lg mb-4 relative overflow-hidden">
+                    <img 
+                      src={story.cover_image_url || "/placeholder.svg"} 
+                      alt={story.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        onClick={() => handleSaveStory(story.id)}
+                        disabled={saveStoryMutation.isPending}
+                        className="h-8 w-8"
+                      >
+                        <Bookmark className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <h3 className="font-fredoka font-semibold text-lg leading-tight">{story.title}</h3>
+                    </div>
+                    
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {story.description}
+                    </p>
+                    
+                    <div className="flex items-center gap-2 text-xs">
+                      <Badge variant="outline">{story.subject}</Badge>
+                      <div className="flex items-center text-muted-foreground">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {story.reading_time || 5} min
+                      </div>
+                      <div className="flex items-center text-muted-foreground">
+                        <Users className="h-3 w-3 mr-1" />
+                        {story.age_min}-{story.age_max}
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      className="w-full font-fredoka" 
+                      variant="hero"
+                      asChild
+                    >
+                      <Link to={`/story/${story.id}`}>
+                        <Play className="h-4 w-4 mr-2" />
+                        Read Story
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
 
