@@ -56,7 +56,7 @@ serve(async (req) => {
 
       case 'POST':
         // Create new child
-        const { name, age, pronouns, grade, reading_level, interests, language_preference } = body;
+        const { name, age, grade, reading_level, interests, language_preference } = body;
 
         if (!name || !age) {
           return new Response(
@@ -71,7 +71,6 @@ serve(async (req) => {
             user_id: user.id,
             name,
             age,
-            pronouns: pronouns || 'they',
             grade,
             reading_level,
             interests: interests || [],

@@ -5,9 +5,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useSettings } from "@/hooks/useSettings";
 import About from "./pages/About";
 import Home from "./pages/Home";
-import Search from "./pages/Search";
 import Library from "./pages/Library";
 import StoryReader from "./pages/StoryReader";
 import Explore from "./pages/Explore";
@@ -50,6 +50,9 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
+  // Apply global settings
+  useSettings();
+  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -59,7 +62,7 @@ const App = () => {
           <Routes>
             {/* Protected Routes */}
             <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-            <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+            
             <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
             <Route path="/story/:storyId" element={<ProtectedRoute><StoryReader /></ProtectedRoute>} />
             <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />

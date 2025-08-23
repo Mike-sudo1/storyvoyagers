@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useCreateChild, useUpdateChild } from "@/hooks/useChildren";
-import { X, Plus } from "lucide-react";
+import { X } from "lucide-react";
 
 interface ChildProfileFormProps {
   open: boolean;
@@ -19,7 +19,6 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
   const [formData, setFormData] = useState({
     name: child?.name || "",
     age: child?.age || "",
-    pronouns: child?.pronouns || "they",
     grade: child?.grade || "",
     reading_level: child?.reading_level || "",
     language_preference: child?.language_preference || "en",
@@ -27,7 +26,6 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
   });
 
   const [newInterest, setNewInterest] = useState("");
-  
   const createChildMutation = useCreateChild();
   const updateChildMutation = useUpdateChild();
 
@@ -54,7 +52,6 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
     setFormData({
       name: "",
       age: "",
-      pronouns: "they",
       grade: "",
       reading_level: "",
       language_preference: "en",
@@ -68,7 +65,6 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
       setFormData({
         name: child.name || "",
         age: child.age?.toString() || "",
-        pronouns: child.pronouns || "they",
         grade: child.grade || "",
         reading_level: child.reading_level || "",
         language_preference: child.language_preference || "en",
@@ -83,15 +79,6 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
     }
   }, [createChildMutation.isSuccess, updateChildMutation.isSuccess]);
 
-  const addInterest = () => {
-    if (newInterest.trim() && !formData.interests.includes(newInterest.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        interests: [...prev.interests, newInterest.trim()]
-      }));
-      setNewInterest("");
-    }
-  };
 
   const removeInterest = (interest: string) => {
     setFormData(prev => ({
@@ -124,44 +111,38 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="age">Age *</Label>
-              <Input
-                id="age"
-                type="number"
-                min="3"
-                max="12"
-                value={formData.age}
-                onChange={(e) => setFormData(prev => ({ ...prev, age: e.target.value }))}
-                placeholder="5"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Pronouns</Label>
-              <Select value={formData.pronouns} onValueChange={(value) => setFormData(prev => ({ ...prev, pronouns: value }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="he">He/Him</SelectItem>
-                  <SelectItem value="she">She/Her</SelectItem>
-                  <SelectItem value="they">They/Them</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="age">Age *</Label>
+            <Input
+              id="age"
+              type="number"
+              min="3"
+              max="12"
+              value={formData.age}
+              onChange={(e) => setFormData(prev => ({ ...prev, age: e.target.value }))}
+              placeholder="5"
+              required
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Grade</Label>
-              <Input
-                value={formData.grade}
-                onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
-                placeholder="1st Grade"
-              />
+              <Select value={formData.grade} onValueChange={(value) => setFormData(prev => ({ ...prev, grade: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pre-k">Pre-K</SelectItem>
+                  <SelectItem value="kindergarten">Kindergarten</SelectItem>
+                  <SelectItem value="1st">1st Grade</SelectItem>
+                  <SelectItem value="2nd">2nd Grade</SelectItem>
+                  <SelectItem value="3rd">3rd Grade</SelectItem>
+                  <SelectItem value="4th">4th Grade</SelectItem>
+                  <SelectItem value="5th">5th Grade</SelectItem>
+                  <SelectItem value="6th">6th Grade</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -197,17 +178,32 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
 
           <div className="space-y-2">
             <Label>Interests</Label>
-            <div className="flex gap-2">
-              <Input
-                value={newInterest}
-                onChange={(e) => setNewInterest(e.target.value)}
-                placeholder="Add an interest (space, dinosaurs, etc.)"
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addInterest())}
-              />
-              <Button type="button" onClick={addInterest} size="icon" variant="outline">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+            <Select onValueChange={(value) => {
+              if (!formData.interests.includes(value)) {
+                setFormData(prev => ({
+                  ...prev,
+                  interests: [...prev.interests, value]
+                }));
+              }
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Add interests" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="space">Space & Astronomy</SelectItem>
+                <SelectItem value="dinosaurs">Dinosaurs</SelectItem>
+                <SelectItem value="animals">Animals</SelectItem>
+                <SelectItem value="science">Science Experiments</SelectItem>
+                <SelectItem value="history">History</SelectItem>
+                <SelectItem value="math">Mathematics</SelectItem>
+                <SelectItem value="art">Art & Creativity</SelectItem>
+                <SelectItem value="sports">Sports</SelectItem>
+                <SelectItem value="music">Music</SelectItem>
+                <SelectItem value="cooking">Cooking</SelectItem>
+                <SelectItem value="nature">Nature</SelectItem>
+                <SelectItem value="adventure">Adventure Stories</SelectItem>
+              </SelectContent>
+            </Select>
             {formData.interests.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {formData.interests.map((interest, index) => (

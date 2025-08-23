@@ -184,27 +184,6 @@ const Explore = () => {
                 </CardContent>
               </Card>
 
-              {/* Stats Card */}
-              <Card className="bg-gradient-adventure border-0 shadow-soft">
-                <CardContent className="p-6 text-white">
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-2">
-                      <Sparkles className="h-5 w-5" />
-                      <h3 className="font-fredoka font-semibold">Story Stats</h3>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center">
-                        <div className="font-fredoka font-bold text-2xl">50+</div>
-                        <div className="text-xs opacity-90">Total Stories</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-fredoka font-bold text-2xl">4.8</div>
-                        <div className="text-xs opacity-90">Avg Rating</div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Story Grid */}
@@ -228,7 +207,12 @@ const Explore = () => {
 
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredStories.map((story, index) => (
-                  <StoryPreview key={index} {...story} />
+                  <StoryPreview 
+                    key={index} 
+                    {...story} 
+                    onSave={() => console.log('Save story:', story.title)}
+                    isSaved={false}
+                  />
                 ))}
               </div>
 

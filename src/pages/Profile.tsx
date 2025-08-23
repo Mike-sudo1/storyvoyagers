@@ -231,41 +231,6 @@ const Profile = () => {
                 <ChildProfileCard isNew={true} />
               </div>
 
-              <Card className="bg-gradient-card border-0 shadow-soft">
-                <CardHeader>
-                  <CardTitle className="font-fredoka flex items-center">
-                    <Camera className="h-5 w-5 mr-2" />
-                    Avatar Creation Guidelines
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-success">✅ Good Photo Tips:</h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• Clear, well-lit face photo</li>
-                        <li>• Child looking at camera</li>
-                        <li>• Minimal background distractions</li>
-                        <li>• Close-up of face and shoulders</li>
-                      </ul>
-                    </div>
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-destructive">❌ Avoid These:</h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• Blurry or dark images</li>
-                        <li>• Side profile or looking away</li>
-                        <li>• Sunglasses or face coverings</li>
-                        <li>• Multiple people in photo</li>
-                      </ul>
-                    </div>
-                  </div>
-                  <div className="bg-primary/5 p-4 rounded-lg">
-                    <p className="text-sm font-medium text-primary">
-                      🔒 Privacy Note: Original photos are processed locally and never stored. Only the cartoon avatar is saved to your child's profile.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-8">
@@ -329,8 +294,13 @@ const Profile = () => {
 
                     <div className="space-y-2">
                       <Label>High Contrast Mode</Label>
-                      <Button variant="outline" size="sm" className="w-full justify-between">
-                        <span>Off</span>
+                      <Button 
+                        variant={profile.high_contrast ? 'hero' : 'outline'} 
+                        size="sm" 
+                        className="w-full justify-between"
+                        onClick={() => handleSettingChange('high_contrast', !profile.high_contrast)}
+                      >
+                        <span>{profile.high_contrast ? 'On' : 'Off'}</span>
                         <Eye className="h-3 w-3" />
                       </Button>
                     </div>
@@ -348,26 +318,68 @@ const Profile = () => {
                     <div className="space-y-2">
                       <Label>Default Narration Speed</Label>
                       <div className="grid grid-cols-3 gap-2">
-                        <Button variant="outline" size="sm">Slow</Button>
-                        <Button variant="hero" size="sm">Normal</Button>
-                        <Button variant="outline" size="sm">Fast</Button>
+                        <Button 
+                          variant={profile.narration_speed === 'slow' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('narration_speed', 'slow')}
+                        >
+                          Slow
+                        </Button>
+                        <Button 
+                          variant={profile.narration_speed === 'normal' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('narration_speed', 'normal')}
+                        >
+                          Normal
+                        </Button>
+                        <Button 
+                          variant={profile.narration_speed === 'fast' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('narration_speed', 'fast')}
+                        >
+                          Fast
+                        </Button>
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <Label>Auto-play Stories</Label>
-                      <Button variant="hero" size="sm" className="w-full justify-between">
-                        <span>Enabled</span>
+                      <Button 
+                        variant={profile.auto_play ? 'hero' : 'outline'} 
+                        size="sm" 
+                        className="w-full justify-between"
+                        onClick={() => handleSettingChange('auto_play', !profile.auto_play)}
+                      >
+                        <span>{profile.auto_play ? 'Enabled' : 'Disabled'}</span>
                         <Volume2 className="h-3 w-3" />
                       </Button>
                     </div>
 
                     <div className="space-y-2">
                       <Label>Reading Reminders</Label>
-                      <Button variant="outline" size="sm" className="w-full justify-between">
-                        <span>Daily at 7:00 PM</span>
-                        <Edit className="h-3 w-3" />
-                      </Button>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button 
+                          variant={profile.reading_reminders === 'daily' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('reading_reminders', 'daily')}
+                        >
+                          Daily
+                        </Button>
+                        <Button 
+                          variant={profile.reading_reminders === 'weekly' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('reading_reminders', 'weekly')}
+                        >
+                          Weekly
+                        </Button>
+                        <Button 
+                          variant={profile.reading_reminders === 'off' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('reading_reminders', 'off')}
+                        >
+                          Off
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -412,10 +424,29 @@ const Profile = () => {
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label>Auto-download Stories</Label>
-                      <Button variant="hero" size="sm" className="w-full justify-between">
-                        <span>WiFi Only</span>
-                        <Settings className="h-3 w-3" />
-                      </Button>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button 
+                          variant={profile.auto_download === 'wifi' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('auto_download', 'wifi')}
+                        >
+                          WiFi Only
+                        </Button>
+                        <Button 
+                          variant={profile.auto_download === 'always' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('auto_download', 'always')}
+                        >
+                          Always
+                        </Button>
+                        <Button 
+                          variant={profile.auto_download === 'never' ? 'hero' : 'outline'} 
+                          size="sm"
+                          onClick={() => handleSettingChange('auto_download', 'never')}
+                        >
+                          Never
+                        </Button>
+                      </div>
                     </div>
                     
                     <div className="space-y-2">

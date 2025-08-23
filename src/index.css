@@ -4,6 +4,7 @@
 
 /* Kid-Inside-The-Story Design System - Magical Educational Adventure Theme */
 @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@300;400;700&display=swap');
 
 @layer base {
   :root {
@@ -131,6 +132,34 @@
   body {
     @apply bg-background text-foreground font-inter;
     background: var(--gradient-bg);
+  }
+  
+  /* Dyslexia-friendly font when preference is set */
+  body.dyslexia-font {
+    font-family: 'Comic Neue', 'Comic Sans MS', cursive, sans-serif !important;
+  }
+  
+  body.dyslexia-font .font-fredoka {
+    font-family: 'Comic Neue', 'Comic Sans MS', cursive, sans-serif !important;
+  }
+  
+  body.dyslexia-font .font-inter {
+    font-family: 'Comic Neue', 'Comic Sans MS', cursive, sans-serif !important;
+  }
+
+  /* High contrast mode */
+  [data-theme="high-contrast"] {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 90%;
+    --muted-foreground: 0 0% 10%;
+    --border: 0 0% 60%;
   }
 
   /* Fredoka font for headings and kid-friendly text */
