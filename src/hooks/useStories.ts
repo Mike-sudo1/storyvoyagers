@@ -6,6 +6,10 @@ export const useStories = () => {
   return useQuery({
     queryKey: ['stories'],
     queryFn: async () => {
+      if (!supabase) {
+        throw new Error('Supabase not connected');
+      }
+      
       const { data, error } = await supabase
         .from('stories')
         .select('*')
@@ -22,6 +26,10 @@ export const useSaveStory = () => {
   
   return useMutation({
     mutationFn: async (storyId: string) => {
+      if (!supabase) {
+        throw new Error('Supabase not connected');
+      }
+      
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
