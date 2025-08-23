@@ -14,7 +14,203 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      children: {
+        Row: {
+          age: number | null
+          avatar_url: string | null
+          badges: number | null
+          created_at: string
+          grade: string | null
+          id: string
+          interests: string[] | null
+          language_preference: string | null
+          name: string
+          pronouns: string | null
+          reading_level: string | null
+          stories_completed: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          age?: number | null
+          avatar_url?: string | null
+          badges?: number | null
+          created_at?: string
+          grade?: string | null
+          id?: string
+          interests?: string[] | null
+          language_preference?: string | null
+          name: string
+          pronouns?: string | null
+          reading_level?: string | null
+          stories_completed?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          age?: number | null
+          avatar_url?: string | null
+          badges?: number | null
+          created_at?: string
+          grade?: string | null
+          id?: string
+          interests?: string[] | null
+          language_preference?: string | null
+          name?: string
+          pronouns?: string | null
+          reading_level?: string | null
+          stories_completed?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      library_items: {
+        Row: {
+          created_at: string
+          id: string
+          last_read_at: string | null
+          progress: number | null
+          status: string | null
+          story_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_read_at?: string | null
+          progress?: number | null
+          status?: string | null
+          story_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_read_at?: string | null
+          progress?: number | null
+          status?: string | null
+          story_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_items_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          auto_download: string | null
+          auto_play: boolean | null
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          font_preference: string | null
+          full_name: string | null
+          high_contrast: boolean | null
+          id: string
+          language_preference: string | null
+          narration_speed: string | null
+          reading_reminders: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_download?: string | null
+          auto_play?: boolean | null
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          font_preference?: string | null
+          full_name?: string | null
+          high_contrast?: boolean | null
+          id?: string
+          language_preference?: string | null
+          narration_speed?: string | null
+          reading_reminders?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_download?: string | null
+          auto_play?: boolean | null
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          font_preference?: string | null
+          full_name?: string | null
+          high_contrast?: boolean | null
+          id?: string
+          language_preference?: string | null
+          narration_speed?: string | null
+          reading_reminders?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stories: {
+        Row: {
+          age_max: number
+          age_min: number
+          content: string | null
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          difficulty: string | null
+          genre: string | null
+          id: string
+          is_premium: boolean | null
+          language: string | null
+          reading_time: number | null
+          subject: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          age_max: number
+          age_min: number
+          content?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          difficulty?: string | null
+          genre?: string | null
+          id?: string
+          is_premium?: boolean | null
+          language?: string | null
+          reading_time?: number | null
+          subject: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          age_max?: number
+          age_min?: number
+          content?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          difficulty?: string | null
+          genre?: string | null
+          id?: string
+          is_premium?: boolean | null
+          language?: string | null
+          reading_time?: number | null
+          subject?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
