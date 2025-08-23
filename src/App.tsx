@@ -2,7 +2,6 @@ import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
@@ -17,7 +16,6 @@ import Profile from "./pages/Profile";
 import SignIn from "./pages/SignIn";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
 
 // Protected Route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -54,7 +52,6 @@ const App = () => {
   useSettings();
   
   return (
-    <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -79,7 +76,6 @@ const App = () => {
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
-    </QueryClientProvider>
   );
 };
 
