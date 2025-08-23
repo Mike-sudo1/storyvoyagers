@@ -21,6 +21,8 @@ interface StoryPreviewProps {
   coverImage?: string;
   isPremium?: boolean;
   isDownloaded?: boolean;
+  onSave?: () => void;
+  isSaved?: boolean;
 }
 
 const StoryPreview = ({
@@ -32,7 +34,9 @@ const StoryPreview = ({
   description,
   coverImage,
   isPremium = false,
-  isDownloaded = false
+  isDownloaded = false,
+  onSave,
+  isSaved = false
 }: StoryPreviewProps) => {
   return (
     <Card className="group hover-lift bg-gradient-card border-0 shadow-soft hover:shadow-card transition-smooth overflow-hidden">
@@ -112,13 +116,23 @@ const StoryPreview = ({
 
         {/* Action Buttons */}
         <div className="flex gap-2 pt-2">
-          <Button variant="hero" size="sm" className="flex-1 text-xs">
-            <User className="h-3 w-3" />
-            Create Story
+          <Button 
+            variant="hero" 
+            size="sm" 
+            className="flex-1 text-xs"
+            onClick={() => alert("Story placeholder")}
+          >
+            Read Story
           </Button>
-          <Button variant="outline" size="sm">
-            <BookOpen className="h-3 w-3" />
-          </Button>
+          {onSave && (
+            <Button 
+              variant={isSaved ? "default" : "outline"} 
+              size="sm"
+              onClick={onSave}
+            >
+              <BookOpen className="h-3 w-3" />
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

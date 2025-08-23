@@ -1,57 +1,122 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { BookOpen, User, Search, Home, Compass, Library, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Sparkles, Menu, X, User, Search, Home, Library } from "lucide-react";
+import { useState } from "react";
 
 const Header = () => {
+  const location = useLocation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const navigation = [
+    { name: "Home", href: "/", icon: Home },
+    { name: "Search", href: "/search", icon: Search },
+    { name: "Library", href: "/library", icon: Library },
+    { name: "Profile", href: "/profile", icon: User },
+  ];
+
   return (
-    <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
-      <div className="container flex h-16 items-center justify-between">
-        {/* Logo */}
-        <div className="flex items-center space-x-3">
-          <div className="relative">
-            <BookOpen className="h-8 w-8 text-primary animate-float" />
-            <Sparkles className="h-4 w-4 text-accent absolute -top-1 -right-1 animate-sparkle" />
-          </div>
-          <div className="flex flex-col">
-            <h1 className="font-fredoka font-bold text-lg text-primary">Kid Inside</h1>
-            <p className="text-xs text-muted-foreground font-medium -mt-1">The Story</p>
-          </div>
-        </div>
+    <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          <Link to="/" className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-cosmic rounded-xl flex items-center justify-center">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="font-fredoka font-bold text-xl">StoryVoyagers</h1>
+              <p className="text-xs text-muted-foreground">Educational Adventures</p>
+            </div>
+          </Link>
 
-        {/* Navigation - Hidden on mobile */}
-        <nav className="hidden md:flex items-center space-x-6">
-          <Link to="/" className="flex items-center space-x-2 text-foreground hover:text-primary transition-smooth">
-            <Home className="h-4 w-4" />
-            <span className="font-medium">Home</span>
-          </Link>
-          <Link to="/explore" className="flex items-center space-x-2 text-foreground hover:text-primary transition-smooth">
-            <Compass className="h-4 w-4" />
-            <span className="font-medium">Explore</span>
-          </Link>
-          <Link to="/my-library" className="flex items-center space-x-2 text-foreground hover:text-primary transition-smooth">
-            <Library className="h-4 w-4" />
-            <span className="font-medium">My Library</span>
-          </Link>
-        </nav>
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-1">
+            {navigation.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={cn(
+                    "flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-fredoka font-medium transition-colors hover:bg-primary/10",
+                    location.pathname === item.href
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+          </nav>
 
-        {/* Actions */}
-        <div className="flex items-center space-x-3">
-          <Button variant="ghost" size="icon" className="hidden sm:flex">
-            <Search className="h-4 w-4" />
+          {/* Desktop Actions */}
+          <div className="hidden md:flex items-center space-x-3">
+            <Link to="/about">
+              <Button variant="outline" size="sm" className="font-fredoka">
+                About
+              </Button>
+            </Link>
+            <Link to="/signin">
+              <Button size="sm" className="font-fredoka">
+                <User className="h-4 w-4 mr-2" />
+                Sign In
+              </Button>
+            </Link>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="md:hidden"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
-          <Link to="/signin">
-            <Button variant="outline">
-              <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Sign In</span>
-            </Button>
-          </Link>
-          <Link to="/create-story">
-            <Button variant="hero">
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Get Started</span>
-            </Button>
-          </Link>
         </div>
+
+        {/* Mobile Menu */}
+        {isMenuOpen && (
+          <div className="md:hidden border-t py-4">
+            <nav className="flex flex-col space-y-2">
+              {navigation.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={cn(
+                      "flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-fredoka font-medium transition-colors",
+                      location.pathname === item.href
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-primary/5"
+                    )}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
+              <div className="flex flex-col space-y-2 pt-4 border-t">
+                <Link to="/about" onClick={() => setIsMenuOpen(false)}>
+                  <Button variant="outline" size="sm" className="w-full font-fredoka">
+                    About
+                  </Button>
+                </Link>
+                <Link to="/signin" onClick={() => setIsMenuOpen(false)}>
+                  <Button size="sm" className="w-full font-fredoka">
+                    <User className="h-4 w-4 mr-2" />
+                    Sign In
+                  </Button>
+                </Link>
+              </div>
+            </nav>
+          </div>
+        )}
       </div>
     </header>
   );

@@ -3,7 +3,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import About from "./pages/About";
+import Home from "./pages/Home";
+import Search from "./pages/Search";
+import Library from "./pages/Library";
+import StoryReader from "./pages/StoryReader";
 import Explore from "./pages/Explore";
 import MyLibrary from "./pages/MyLibrary";
 import CreateStory from "./pages/CreateStory";
@@ -20,7 +24,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/search" element={<Search />} />
+          <Route path="/library" element={<Library />} />
+          <Route path="/story/:storyId" element={<StoryReader />} />
           <Route path="/explore" element={<Explore />} />
           <Route path="/my-library" element={<MyLibrary />} />
           <Route path="/create-story" element={<CreateStory />} />
