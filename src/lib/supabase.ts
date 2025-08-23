@@ -3,17 +3,25 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Debug logging
+console.log('🔍 Supabase Environment Check:');
+console.log('VITE_SUPABASE_URL:', supabaseUrl ? 'SET' : 'NOT SET');
+console.log('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'SET' : 'NOT SET');
+
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase configuration missing. Please connect your Supabase project in Lovable.');
-  console.log('Available env vars:', {
-    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL ? 'SET' : 'NOT SET',
-    VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET'
-  });
+  console.error('❌ Supabase configuration missing. Please connect your Supabase project in Lovable.');
+  console.log('Available env vars:', Object.keys(import.meta.env));
 }
 
 export const supabase = supabaseUrl && supabaseAnonKey 
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
+
+if (supabase) {
+  console.log('✅ Supabase client created successfully');
+} else {
+  console.log('❌ Supabase client is null - connection needed');
+}
 
 export type Database = {
   public: {
