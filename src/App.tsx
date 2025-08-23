@@ -16,7 +16,6 @@ import Profile from "./pages/Profile";
 import SignIn from "./pages/SignIn";
 import NotFound from "./pages/NotFound";
 
-
 // Protected Route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -52,30 +51,29 @@ const App = () => {
   useSettings();
   
   return (
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* Protected Routes */}
-            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-            
-            <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-            <Route path="/story/:storyId" element={<ProtectedRoute><StoryReader /></ProtectedRoute>} />
-            <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
-            <Route path="/my-library" element={<ProtectedRoute><MyLibrary /></ProtectedRoute>} />
-            <Route path="/create-story" element={<ProtectedRoute><CreateStory /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            
-            {/* Public Routes */}
-            <Route path="/about" element={<PublicRoute><About /></PublicRoute>} />
-            <Route path="/signin" element={<PublicRoute><SignIn /></PublicRoute>} />
-            
-            {/* Catch-all route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          {/* Protected Routes */}
+          <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+          <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+          <Route path="/story/:storyId" element={<ProtectedRoute><StoryReader /></ProtectedRoute>} />
+          <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
+          <Route path="/my-library" element={<ProtectedRoute><MyLibrary /></ProtectedRoute>} />
+          <Route path="/create-story" element={<ProtectedRoute><CreateStory /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          
+          {/* Public Routes */}
+          <Route path="/about" element={<PublicRoute><About /></PublicRoute>} />
+          <Route path="/signin" element={<PublicRoute><SignIn /></PublicRoute>} />
+          
+          {/* Catch-all route */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
   );
 };
 
