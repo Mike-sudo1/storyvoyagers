@@ -11,7 +11,7 @@ export const useLibrary = () => {
         throw new Error('Not authenticated');
       }
 
-      const { data: libraryItems, error } = await supabase
+      const { data: libraryItems, error } = await (supabase as any)
         .from('library_items')
         .select(`
           *,

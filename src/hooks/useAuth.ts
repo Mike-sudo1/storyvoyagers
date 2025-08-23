@@ -7,13 +7,6 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if Supabase is connected
-    if (!supabase) {
-      console.log('Supabase not connected, skipping auth setup');
-      setLoading(false);
-      return;
-    }
-
     // Get initial session
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -35,10 +28,6 @@ export const useAuth = () => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Supabase not connected' } };
-    }
-    
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -47,10 +36,6 @@ export const useAuth = () => {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Supabase not connected' } };
-    }
-    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -64,10 +49,6 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
-    if (!supabase) {
-      return { error: { message: 'Supabase not connected' } };
-    }
-    
     const { error } = await supabase.auth.signOut();
     return { error };
   };

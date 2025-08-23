@@ -10,7 +10,7 @@ export const useStories = () => {
         throw new Error('Supabase not connected');
       }
       
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('stories')
         .select('*')
         .order('created_at', { ascending: false });
@@ -36,21 +36,18 @@ export const useSaveStory = () => {
         throw new Error('Not authenticated');
       }
 
-      const response = await fetch('/functions/v1/save-to-library', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ storyId }),
-      });
+      const { data: libraryItem, error } = await (supabase as any)
+        .from('library_items')
+        .insert({
+          user_id: session.user.id,
+          story_id: storyId,
+          status: 'saved'
+        })
+        .select()
+        .single();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save story');
-      }
-
-      return response.json();
+      if (error) throw error;
+      return libraryItem;
     },
     onSuccess: (data) => {
       toast.success('Story saved to library!');
