@@ -14,6 +14,8 @@ import MyLibrary from "./pages/MyLibrary";
 import CreateStory from "./pages/CreateStory";
 import Profile from "./pages/Profile";
 import SignIn from "./pages/SignIn";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 // Protected Route component
@@ -68,6 +70,8 @@ const App = () => {
           {/* Public Routes */}
           <Route path="/about" element={<PublicRoute><About /></PublicRoute>} />
           <Route path="/signin" element={<PublicRoute><SignIn /></PublicRoute>} />
+          <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           
           {/* Catch-all route */}
           <Route path="*" element={<NotFound />} />
