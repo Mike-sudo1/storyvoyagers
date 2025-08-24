@@ -64,10 +64,13 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
 
   const handleCartoonify = () => {
     if (selectedImage && createdChildId) {
+      console.log('Starting cartoonify process for child:', createdChildId);
       cartoonifyMutation.mutate({
         childId: createdChildId,
         imageFile: selectedImage
       });
+    } else {
+      console.error('Missing image or child ID', { selectedImage: !!selectedImage, createdChildId });
     }
   };
 
@@ -109,14 +112,18 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
     if (createChildMutation.isSuccess && !isEditing) {
       // Move to photo step after successful child creation
       const childData = createChildMutation.data?.child;
+      console.log('Child created successfully:', childData);
       if (childData?.id) {
         setCreatedChildId(childData.id);
         setStep('photo');
+      } else {
+        console.error('No child ID returned');
+        handleSuccess(); // Fallback: close form if no ID
       }
     } else if (updateChildMutation.isSuccess || (createChildMutation.isSuccess && isEditing)) {
       handleSuccess();
     }
-  }, [createChildMutation.isSuccess, updateChildMutation.isSuccess, isEditing]);
+  }, [createChildMutation.isSuccess, updateChildMutation.isSuccess, isEditing, createChildMutation.data]);
 
   React.useEffect(() => {
     if (cartoonifyMutation.isSuccess) {

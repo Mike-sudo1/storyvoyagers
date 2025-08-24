@@ -12,6 +12,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Request received:', req.method);
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -26,15 +28,18 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError || !user) {
+      console.log('Authentication error:', userError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const url = new URL(req.url);
-    const method = req.method;
-    const body = method !== 'GET' ? await req.json() : null;
+    // Parse request body
+    const body = req.method !== 'GET' ? await req.json() : {};
+    const method = body.method || req.method;
+    
+    console.log('Processing method:', method, 'Body:', body);
 
     switch (method) {
       case 'GET':
@@ -148,6 +153,7 @@ serve(async (req) => {
     }
 
   } catch (error) {
+    console.error('Edge function error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

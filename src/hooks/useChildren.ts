@@ -7,7 +7,7 @@ export const useChildren = () => {
     queryKey: ['children'],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('manage-children', {
-        method: 'GET'
+        body: { method: 'GET' }
       });
 
       if (error) {
@@ -33,8 +33,7 @@ export const useCreateChild = () => {
       language_preference?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke('manage-children', {
-        method: 'POST',
-        body: childData
+        body: { method: 'POST', ...childData }
       });
 
       if (error) {
@@ -68,8 +67,7 @@ export const useUpdateChild = () => {
       language_preference?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke('manage-children', {
-        method: 'PUT',
-        body: { id: childId, ...childData }
+        body: { method: 'PUT', id: childId, ...childData }
       });
 
       if (error) {
@@ -94,8 +92,7 @@ export const useDeleteChild = () => {
   return useMutation({
     mutationFn: async (childId: string) => {
       const { data, error } = await supabase.functions.invoke('manage-children', {
-        method: 'DELETE',
-        body: { id: childId }
+        body: { method: 'DELETE', id: childId }
       });
 
       if (error) {
@@ -125,6 +122,7 @@ export const useCartoonifyAvatar = () => {
         throw new Error('Not authenticated');
       }
 
+      console.log('Cartoonifying avatar for child:', childId);
       const formData = new FormData();
       formData.append('image', imageFile);
       formData.append('childId', childId);
@@ -139,17 +137,27 @@ export const useCartoonifyAvatar = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        console.error('Cartoonify error response:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: `HTTP ${response.status}: ${errorText}` };
+        }
         throw new Error(errorData.error || 'Failed to cartoonify avatar');
       }
 
-      return response.json();
+      const result = await response.json();
+      console.log('Cartoonify success:', result);
+      return result;
     },
     onSuccess: (data) => {
       toast.success(data.message || 'Avatar cartoonified successfully!');
       queryClient.invalidateQueries({ queryKey: ['children'] });
     },
     onError: (error: Error) => {
+      console.error('Cartoonify mutation error:', error);
       toast.error(error.message || 'Failed to cartoonify avatar');
     }
   });
