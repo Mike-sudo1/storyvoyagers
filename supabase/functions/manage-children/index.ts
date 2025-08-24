@@ -90,8 +90,8 @@ serve(async (req) => {
 
       case 'PUT':
         // Update child
-        const childId = url.searchParams.get('id');
-        if (!childId) {
+        const { id: updateChildId, ...updateData } = body;
+        if (!updateChildId) {
           return new Response(
             JSON.stringify({ error: 'Child ID is required' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -100,8 +100,8 @@ serve(async (req) => {
 
         const { data: updatedChild, error: updateError } = await supabase
           .from('children')
-          .update(body)
-          .eq('id', childId)
+          .update(updateData)
+          .eq('id', updateChildId)
           .eq('user_id', user.id)
           .select()
           .single();
@@ -117,7 +117,7 @@ serve(async (req) => {
 
       case 'DELETE':
         // Delete child
-        const deleteChildId = url.searchParams.get('id');
+        const { id: deleteChildId } = body;
         if (!deleteChildId) {
           return new Response(
             JSON.stringify({ error: 'Child ID is required' }),

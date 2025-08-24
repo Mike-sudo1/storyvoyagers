@@ -6,26 +6,14 @@ export const useChildren = () => {
   return useQuery({
     queryKey: ['children'],
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await fetch('/functions/v1/manage-children', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
+      const { data, error } = await supabase.functions.invoke('manage-children', {
+        method: 'GET'
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch children');
+      if (error) {
+        throw new Error(error.message || 'Failed to fetch children');
       }
 
-      const data = await response.json();
       return data.children || [];
     }
   });
@@ -44,27 +32,16 @@ export const useCreateChild = () => {
       interests?: string[];
       language_preference?: string;
     }) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await fetch('/functions/v1/manage-children', {
+      const { data, error } = await supabase.functions.invoke('manage-children', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(childData),
+        body: childData
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create child');
+      if (error) {
+        throw new Error(error.message || 'Failed to create child');
       }
 
-      return response.json();
+      return data;
     },
     onSuccess: (data) => {
       toast.success('Child profile created successfully!');
@@ -90,27 +67,16 @@ export const useUpdateChild = () => {
       interests?: string[];
       language_preference?: string;
     }) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await fetch(`/functions/v1/manage-children?id=${childId}`, {
+      const { data, error } = await supabase.functions.invoke('manage-children', {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(childData),
+        body: { id: childId, ...childData }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update child');
+      if (error) {
+        throw new Error(error.message || 'Failed to update child');
       }
 
-      return response.json();
+      return data;
     },
     onSuccess: (data) => {
       toast.success('Child profile updated successfully!');
@@ -127,26 +93,16 @@ export const useDeleteChild = () => {
   
   return useMutation({
     mutationFn: async (childId: string) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await fetch(`/functions/v1/manage-children?id=${childId}`, {
+      const { data, error } = await supabase.functions.invoke('manage-children', {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
+        body: { id: childId }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete child');
+      if (error) {
+        throw new Error(error.message || 'Failed to delete child');
       }
 
-      return response.json();
+      return data;
     },
     onSuccess: (data) => {
       toast.success('Child profile deleted successfully!');
@@ -173,7 +129,8 @@ export const useCartoonifyAvatar = () => {
       formData.append('image', imageFile);
       formData.append('childId', childId);
 
-      const response = await fetch('/functions/v1/cartoonify-avatar', {
+      // Use the Supabase project URL for FormData uploads
+      const response = await fetch('https://bsjjxgpaxfawoyjgufgo.supabase.co/functions/v1/cartoonify-avatar', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
