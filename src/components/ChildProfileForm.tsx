@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useCreateChild, useUpdateChild } from "@/hooks/useChildren";
-import { X } from "lucide-react";
+import { useCreateChild, useUpdateChild, useCartoonifyAvatar } from "@/hooks/useChildren";
+import { X, Upload, Camera } from "lucide-react";
 
 interface ChildProfileFormProps {
   open: boolean;
@@ -25,9 +25,15 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
     interests: child?.interests || []
   });
 
-  const [newInterest, setNewInterest] = useState("");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [step, setStep] = useState<'form' | 'photo'>('form');
+  const [createdChildId, setCreatedChildId] = useState<string>("");
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const createChildMutation = useCreateChild();
   const updateChildMutation = useUpdateChild();
+  const cartoonifyMutation = useCartoonifyAvatar();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +53,28 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
     }
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    }
+  };
+
+  const handleCartoonify = () => {
+    if (selectedImage && createdChildId) {
+      cartoonifyMutation.mutate({
+        childId: createdChildId,
+        imageFile: selectedImage
+      });
+    }
+  };
+
+  const handleSkipPhoto = () => {
+    handleSuccess();
+  };
+
   const handleSuccess = () => {
     onOpenChange(false);
     setFormData({
@@ -57,6 +85,10 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
       language_preference: "en",
       interests: []
     });
+    setSelectedImage(null);
+    setPreviewUrl("");
+    setStep('form');
+    setCreatedChildId("");
   };
 
   // Reset form when dialog opens/closes
@@ -74,10 +106,23 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
   }, [open, child, isEditing]);
 
   React.useEffect(() => {
-    if (createChildMutation.isSuccess || updateChildMutation.isSuccess) {
+    if (createChildMutation.isSuccess && !isEditing) {
+      // Move to photo step after successful child creation
+      const childData = createChildMutation.data?.child;
+      if (childData?.id) {
+        setCreatedChildId(childData.id);
+        setStep('photo');
+      }
+    } else if (updateChildMutation.isSuccess || (createChildMutation.isSuccess && isEditing)) {
       handleSuccess();
     }
-  }, [createChildMutation.isSuccess, updateChildMutation.isSuccess]);
+  }, [createChildMutation.isSuccess, updateChildMutation.isSuccess, isEditing]);
+
+  React.useEffect(() => {
+    if (cartoonifyMutation.isSuccess) {
+      handleSuccess();
+    }
+  }, [cartoonifyMutation.isSuccess]);
 
 
   const removeInterest = (interest: string) => {
@@ -92,14 +137,18 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-fredoka">
-            {isEditing ? "Edit Child Profile" : "Add New Child"}
+            {step === 'photo' ? "Add Profile Picture" : (isEditing ? "Edit Child Profile" : "Add New Child")}
           </DialogTitle>
           <DialogDescription>
-            {isEditing ? "Update your child's information" : "Create a new child profile for personalized stories"}
+            {step === 'photo' 
+              ? "Upload a photo to create a cartoon avatar for your child"
+              : (isEditing ? "Update your child's information" : "Create a new child profile for personalized stories")
+            }
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {step === 'form' ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name *</Label>
             <Input
@@ -216,22 +265,92 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
             )}
           </div>
 
-          <div className="flex gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              className="flex-1"
-              disabled={createChildMutation.isPending || updateChildMutation.isPending}
-            >
-              {createChildMutation.isPending || updateChildMutation.isPending ? 
-                "Saving..." : 
-                isEditing ? "Update Profile" : "Create Profile"
-              }
-            </Button>
+            <div className="flex gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                className="flex-1"
+                disabled={createChildMutation.isPending || updateChildMutation.isPending}
+              >
+                {createChildMutation.isPending || updateChildMutation.isPending ? 
+                  "Saving..." : 
+                  isEditing ? "Update Profile" : "Create Profile"
+                }
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                {previewUrl ? (
+                  <div className="space-y-4">
+                    <img 
+                      src={previewUrl} 
+                      alt="Selected photo" 
+                      className="mx-auto max-w-full max-h-48 rounded-lg object-cover"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Choose Different Photo
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <div>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full"
+                      >
+                        <Camera className="h-4 w-4 mr-2" />
+                        Upload Photo
+                      </Button>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Choose a clear, well-lit photo for best results
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleSkipPhoto} 
+                className="flex-1"
+              >
+                Skip Photo
+              </Button>
+              <Button 
+                onClick={handleCartoonify}
+                disabled={!selectedImage || cartoonifyMutation.isPending}
+                className="flex-1"
+              >
+                {cartoonifyMutation.isPending ? "Creating Avatar..." : "Create Avatar"}
+              </Button>
+            </div>
           </div>
-        </form>
+        )}
       </DialogContent>
     </Dialog>
   );
