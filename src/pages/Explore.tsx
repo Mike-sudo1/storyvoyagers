@@ -6,95 +6,64 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { useStories } from "@/hooks/useStories";
+import { useLibrary, useSaveToLibrary, useRemoveFromLibrary } from "@/hooks/useLibrary";
 import { 
   Search, 
   Filter, 
   Compass, 
   BookOpen, 
   Sparkles,
-  Clock,
   Star,
   Users
 } from "lucide-react";
 
-const subjects = ["All", "History", "Science", "Math", "Geography"];
 const ageRanges = ["All Ages", "Ages 3-5", "Ages 6-8", "Ages 9-12"];
-
-const allStories = [
-  {
-    title: "Moon Landing Adventure with Emma",
-    subject: "History",
-    ageRange: "Ages 6-9",
-    duration: "12 min",
-    rating: 4.9,
-    description: "Join Emma as she becomes an astronaut alongside Neil Armstrong and Buzz Aldrin in the historic Apollo 11 mission.",
-    isPremium: false,
-    isDownloaded: true
-  },
-  {
-    title: "The Water Cycle Quest with Alex",
-    subject: "Science", 
-    ageRange: "Ages 5-8",
-    duration: "8 min",
-    rating: 4.8,
-    description: "Alex discovers how water travels around our planet! From fluffy clouds to rushing rivers.",
-    isPremium: true,
-    isDownloaded: false
-  },
-  {
-    title: "Egyptian Pyramid Mystery with Sofia",
-    subject: "History",
-    ageRange: "Ages 7-10", 
-    duration: "15 min",
-    rating: 4.9,
-    description: "Sofia travels back in time to ancient Egypt to help build the Great Pyramid of Giza.",
-    isPremium: true,
-    isDownloaded: false
-  },
-  {
-    title: "Multiplication Pizza Party with Marcus",
-    subject: "Math",
-    ageRange: "Ages 6-9",
-    duration: "10 min",
-    rating: 4.7,
-    description: "Marcus opens his own pizza restaurant and learns multiplication by serving hungry customers.",
-    isPremium: false,
-    isDownloaded: true
-  },
-  {
-    title: "Volcano Explorer with Maya",
-    subject: "Science",
-    ageRange: "Ages 8-11",
-    duration: "14 min", 
-    rating: 4.8,
-    description: "Maya becomes a volcanologist studying how volcanoes form and why they erupt.",
-    isPremium: true,
-    isDownloaded: false
-  },
-  {
-    title: "Ancient Rome Adventure with Lucas",
-    subject: "History",
-    ageRange: "Ages 9-12",
-    duration: "18 min",
-    rating: 4.9,
-    description: "Lucas becomes a gladiator trainer in ancient Rome, learning about Roman culture and history.",
-    isPremium: true,
-    isDownloaded: false
-  }
-];
 
 const Explore = () => {
   const [selectedSubject, setSelectedSubject] = useState("All");
   const [selectedAge, setSelectedAge] = useState("All Ages");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  const { data: stories = [], isLoading } = useStories();
+  const { data: libraryItems = [] } = useLibrary();
+  const saveToLibrary = useSaveToLibrary();
+  const removeFromLibrary = useRemoveFromLibrary();
 
-  const filteredStories = allStories.filter(story => {
+  // Get unique subjects from stories
+  const availableSubjects = ["All", ...new Set(stories.map((story: any) => story.subject))];
+
+  const filteredStories = stories.filter((story: any) => {
     const matchesSubject = selectedSubject === "All" || story.subject === selectedSubject;
-    const matchesAge = selectedAge === "All Ages" || story.ageRange === selectedAge;
+    const ageRange = `Ages ${story.age_min}-${story.age_max}`;
+    const matchesAge = selectedAge === "All Ages" || selectedAge === ageRange;
     const matchesSearch = story.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         story.description.toLowerCase().includes(searchQuery.toLowerCase());
+                         story.description?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSubject && matchesAge && matchesSearch;
   });
+
+  const isStorySaved = (storyId: string) => {
+    return libraryItems.some((item: any) => item.story_id === storyId);
+  };
+
+  const handleSaveToggle = (storyId: string) => {
+    if (isStorySaved(storyId)) {
+      removeFromLibrary.mutate(storyId);
+    } else {
+      saveToLibrary.mutate(storyId);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="container py-16 text-center">
+          <div className="animate-pulse">Loading stories...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -149,7 +118,7 @@ const Explore = () => {
                   <div className="space-y-3 mb-6">
                     <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Subject</h4>
                     <div className="flex flex-wrap gap-2">
-                      {subjects.map((subject) => (
+                      {availableSubjects.map((subject: string) => (
                         <Button
                           key={subject}
                           variant={selectedSubject === subject ? "hero" : "outline"}
@@ -206,12 +175,21 @@ const Explore = () => {
               </div>
 
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filteredStories.map((story, index) => (
+                {filteredStories.map((story: any) => (
                   <StoryPreview 
-                    key={index} 
-                    {...story} 
-                    onSave={() => console.log('Save story:', story.title)}
-                    isSaved={false}
+                    key={story.id}
+                    title={story.title}
+                    subject={story.subject}
+                    ageRange={`Ages ${story.age_min}-${story.age_max}`}
+                    duration={`${story.reading_time || 10} min`}
+                    rating={4.8} // Default rating since not in DB yet
+                    description={story.description || "An exciting educational adventure!"}
+                    coverImage={story.cover_image_url}
+                    isPremium={story.is_premium}
+                    isDownloaded={false}
+                    onSave={() => handleSaveToggle(story.id)}
+                    isSaved={isStorySaved(story.id)}
+                    isLoading={saveToLibrary.isPending || removeFromLibrary.isPending}
                   />
                 ))}
               </div>

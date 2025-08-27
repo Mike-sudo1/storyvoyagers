@@ -8,7 +8,8 @@ import {
   Star, 
   Download, 
   User,
-  Sparkles 
+  Sparkles,
+  Bookmark
 } from "lucide-react";
 
 interface StoryPreviewProps {
@@ -23,6 +24,7 @@ interface StoryPreviewProps {
   isDownloaded?: boolean;
   onSave?: () => void;
   isSaved?: boolean;
+  isLoading?: boolean;
 }
 
 const StoryPreview = ({
@@ -36,7 +38,8 @@ const StoryPreview = ({
   isPremium = false,
   isDownloaded = false,
   onSave,
-  isSaved = false
+  isSaved = false,
+  isLoading = false
 }: StoryPreviewProps) => {
   return (
     <Card className="group hover-lift bg-gradient-card border-0 shadow-soft hover:shadow-card transition-smooth overflow-hidden">
@@ -68,6 +71,15 @@ const StoryPreview = ({
           <div className="absolute top-3 right-3">
             <div className="p-1.5 bg-success/90 rounded-full">
               <Download className="h-3 w-3 text-white" />
+            </div>
+          </div>
+        )}
+
+        {/* Saved Status */}
+        {isSaved && (
+          <div className="absolute top-3 right-3" style={{ right: isDownloaded ? '3.5rem' : '0.75rem' }}>
+            <div className="p-1.5 bg-primary/90 rounded-full">
+              <Bookmark className="h-3 w-3 text-white fill-white" />
             </div>
           </div>
         )}
@@ -129,8 +141,13 @@ const StoryPreview = ({
               variant={isSaved ? "default" : "outline"} 
               size="sm"
               onClick={onSave}
+              disabled={isLoading}
             >
-              <BookOpen className="h-3 w-3" />
+              {isSaved ? (
+                <Bookmark className="h-3 w-3 fill-current" />
+              ) : (
+                <BookOpen className="h-3 w-3" />
+              )}
             </Button>
           )}
         </div>

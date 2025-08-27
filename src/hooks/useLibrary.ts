@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export const useLibrary = () => {
   return useQuery({
@@ -35,6 +36,71 @@ export const useLibrary = () => {
       if (error) throw error;
       
       return libraryItems || [];
+    }
+  });
+};
+
+export const useSaveToLibrary = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (storyId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const { data, error } = await supabase
+        .from('library_items')
+        .insert({
+          user_id: session.user.id,
+          story_id: storyId,
+          status: 'saved'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['library'] });
+      toast.success('Story saved to library!');
+    },
+    onError: (error) => {
+      console.error('Save to library error:', error);
+      toast.error('Failed to save story to library');
+    }
+  });
+};
+
+export const useRemoveFromLibrary = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (storyId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const { error } = await supabase
+        .from('library_items')
+        .delete()
+        .eq('user_id', session.user.id)
+        .eq('story_id', storyId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['library'] });
+      toast.success('Story removed from library');
+    },
+    onError: (error) => {
+      console.error('Remove from library error:', error);
+      toast.error('Failed to remove story from library');
     }
   });
 };
