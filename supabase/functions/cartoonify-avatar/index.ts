@@ -2,14 +2,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// --- CORS ---
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// --- Locked Cartoon Style ---
 const STYLE_PROMPT = `
 Transform this photo into a cozy children's-book illustration with the following style:
 - Clean, bold outlines (consistent line weight), smooth vector-like shapes
@@ -21,14 +19,6 @@ Transform this photo into a cozy children's-book illustration with the following
 - Overall vibe: warm "bedtime story" look similar to modern PBS Kids storybooks
 Hard rules: no photorealism, no sketchy pencil lines, no anime/manga look, no halftone/comic dots.
 `;
-
-// Optional: night palette (uncomment to bias moon/telescope pages)
-/*
-const PALETTE_HINT = `
-Palette: deep teals and midnight blues for backgrounds; warm moon-yellow accents; gentle cyan highlights.
-Lighting: soft moonlight rim light on the face; avoid harsh contrast.
-`;
-*/
 
 function pngBlobFromB64(b64: string): Blob {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -48,13 +38,12 @@ serve(async (req) => {
       });
     }
 
-    // Supabase client (service role for storage + row updates)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    // Auth: read bearer and resolve user
+    // Auth
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
@@ -67,7 +56,7 @@ serve(async (req) => {
       });
     }
 
-    // Inputs: multipart form with `image` and `childId`
+    // Inputs
     const formData = await req.formData();
     const file = formData.get("image") as File | null;
     const childId = (formData.get("childId") as string | null)?.trim();
@@ -79,7 +68,6 @@ serve(async (req) => {
       });
     }
 
-    // Prepare OpenAI call
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
     if (!OPENAI_API_KEY) {
       return new Response(JSON.stringify({ error: "Missing OPENAI_API_KEY" }), {
@@ -88,69 +76,66 @@ serve(async (req) => {
       });
     }
 
-    // Try EDIT first (turn the photo into the style)
-    const editForm = new FormData();
-    editForm.append("model", "gpt-image-1");
-    editForm.append("prompt", STYLE_PROMPT /* + PALETTE_HINT */);
-    editForm.append("n", "1");
-    editForm.append("size", "1024x1024");
-    // @ts-ignore: Deno FormData supports Blob
-    editForm.append("image", new Blob([await file.arrayBuffer()], { type: file.type }), "source.jpg");
+    // Convert uploaded file to base64
+    const arrayBuffer = await file.arrayBuffer();
+    const base64Image = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
-    const editResp = await fetch("https://api.openai.com/v1/images/edits", {
+    // Call OpenAI edit endpoint
+    const openAIResponse = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
       },
-      body: editForm,
+      body: JSON.stringify({
+        model: "gpt-image-1",
+        image: `data:image/${file.type.split("/")[1]};base64,${base64Image}`,
+        prompt: STYLE_PROMPT,
+        n: 1,
+        size: "1024x1024",
+      }),
     });
 
-    let imageBlob: Blob | null = null;
+    let imageBlob: Blob;
 
-    if (editResp.ok) {
-      const editJson = await editResp.json();
-      const b64 = editJson?.data?.[0]?.b64_json;
-      if (!b64) {
-        throw new Error("OpenAI edit: missing image data");
-      }
+    if (openAIResponse.ok) {
+      const result = await openAIResponse.json();
+      const b64 = result?.data?.[0]?.b64_json;
+      if (!b64) throw new Error("OpenAI edit: missing b64_json");
       imageBlob = pngBlobFromB64(b64);
     } else {
-      // Fallback: GENERATION (still same style; won’t use the input photo directly)
-      const genForm = new FormData();
-      genForm.append("model", "gpt-image-1");
-      genForm.append("prompt", `Portrait, front-and-center composition. ${STYLE_PROMPT}` /* + PALETTE_HINT */);
-      genForm.append("n", "1");
-      genForm.append("size", "1024x1024");
-
-      const genResp = await fetch("https://api.openai.com/v1/images/generations", {
+      // Fallback: generate (does not preserve photo likeness, but keeps style)
+      const genResponse = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
-        headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
-        body: genForm,
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-image-1",
+          prompt: `Portrait, front-and-center composition. ${STYLE_PROMPT}`,
+          n: 1,
+          size: "1024x1024",
+        }),
       });
 
-      const genJson = await genResp.json();
-      if (!genResp.ok) {
-        const msg = genJson?.error?.message || "Unknown error";
-        throw new Error(`OpenAI API error: ${msg}`);
+      const genJson = await genResponse.json();
+      if (!genResponse.ok) {
+        throw new Error(`OpenAI API error: ${genJson?.error?.message || "Unknown error"}`);
       }
       const b64 = genJson?.data?.[0]?.b64_json;
-      if (!b64) {
-        throw new Error("OpenAI generation: missing image data");
-      }
+      if (!b64) throw new Error("OpenAI generation: missing b64_json");
       imageBlob = pngBlobFromB64(b64);
     }
 
-    // Upload to Supabase Storage
+    // Upload to Supabase
     const fileName = `${user.id}/${childId}_avatar_${Date.now()}.png`;
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(fileName, imageBlob!, { contentType: "image/png", upsert: true });
+      .upload(fileName, imageBlob, { contentType: "image/png", upsert: true });
 
-    if (uploadError) {
-      throw uploadError;
-    }
+    if (uploadError) throw uploadError;
 
-    // Public URL
     const { data: publicUrlData } = await supabase.storage.from("avatars").getPublicUrl(fileName);
     const avatarUrl = publicUrlData.publicUrl;
 
@@ -161,9 +146,7 @@ serve(async (req) => {
       .eq("id", childId)
       .eq("user_id", user.id);
 
-    if (updateError) {
-      throw updateError;
-    }
+    if (updateError) throw updateError;
 
     return new Response(
       JSON.stringify({
