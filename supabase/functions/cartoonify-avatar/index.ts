@@ -12,11 +12,17 @@ const STYLE_PROMPT = `Transform this photo into a cozy children's-book illustrat
 - Clean, bold outlines (consistent line weight), smooth vector-like shapes
 - Bright but gentle colors with soft gradients (no harsh shadows)
 - Childlike proportions: slightly oversized head, rounded features
-- Face: big round eyes, small curved nose, soft smile, subtle cheek blush; preserve likeness
-- Clothing simplified and readable; avoid tiny details
-- Background simple and whimsical (flat shapes, soft clouds, tiny stars when night), uncluttered
 - Overall vibe: warm "bedtime story" look similar to modern PBS Kids storybooks
 Hard rules: no photorealism, no sketchy pencil lines, no anime/manga look, no halftone/comic dots.
+
+Faithful likeness & analysis (very important):
+- Preserve the person's DISTINCT features from the photo: face shape, eye shape/spacing, nose shape/size, mouth shape, eyebrow thickness/angle, ear shape, and skin tone.
+- Keep the exact HAIRSTYLE (length, part, curls/texture), hairline, and color.
+- Match CLOTHING colors/patterns and key accessories (glasses, headbands, hats, earrings).
+- Follow the same POSE, head tilt, and camera angle as the input photo.
+- Maintain the same LIGHTING direction and key highlights/shadows (translate into soft, storybook shading).
+- Include any SIGNATURE props or background anchors that frame the person (e.g., telescope, distinctive furniture) but simplify them to flat, uncluttered shapes.
+- Use the photo as the source of truth; DO NOT replace features with generic or idealized ones.
 `;
 
 function pngBlobFromB64(b64: string): Blob {
@@ -24,13 +30,12 @@ function pngBlobFromB64(b64: string): Blob {
   return new Blob([bytes], { type: "image/png" });
 }
 
-// ---- ONLY CHANGE: safe base64 encoder without huge spread ----
+// ---- safe base64 encoder without huge spread (unchanged) ----
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   const chunkSize = 0x8000; // 32KB chunks
   for (let i = 0; i < bytes.length; i += chunkSize) {
     const chunk = bytes.subarray(i, i + chunkSize);
-    // small, safe spread per chunk
     binary += String.fromCharCode(...chunk);
   }
   return btoa(binary);
