@@ -13,30 +13,16 @@ const corsHeaders = {
 // Max image size you’ll accept (tune as needed)
 const MAX_BYTES = 12 * 1024 * 1024; // 12 MB
 
-const STYLE_PROMPT = `Stylize THIS EXACT PHOTO into a cozy children's-book illustration while preserving the subject's identity and scene.
-
-STYLE
+const STYLE_PROMPT = `
+Transform this photo into a cozy children's-book illustration with the following style:
 - Clean, bold outlines (consistent line weight), smooth vector-like shapes
 - Bright but gentle colors with soft gradients (no harsh shadows)
 - Childlike proportions: slightly oversized head, rounded features
-- Warm "bedtime story" vibe similar to modern PBS Kids storybooks
-- Background simplified and uncluttered (flat shapes, soft clouds, tiny stars if night)
-
-STRICT LIKENESS (highest priority — use the input photo as the structural reference)
-- Preserve the subject’s DISTINCT facial geometry: overall face shape, eye shape/spacing, nose width/length, mouth shape, eyebrow thickness/angle, ears
-- Keep the exact HAIRSTYLE (length, part, curl/texture), hairline, and natural hair color
-- Match true SKIN TONE and undertone (do not lighten or darken)
-- Copy CLOTHING colors/patterns and accessories (glasses, headbands, hats, earrings)
-- Keep the same POSE, head tilt, camera angle, and FOV as the photo
-- Maintain LIGHTING direction and key highlight/shadow placements, translated into soft storybook shading
-- Include key SCENE ANCHORS (e.g., telescope, distinctive furniture) simplified into flat, readable shapes
-- Use the input photo’s color palette when possible
-
-DO NOT
-- Do not replace features with generic/idealized ones
-- Do not change hair color, skin tone, or clothing colors
-- Do not invent new backgrounds or props unless missing; prefer simplifying what's present
-- No photorealism, no sketchy pencil lines, no anime/manga look, no halftone/comic dots
+- Face: big round eyes, small curved nose, soft smile, subtle cheek blush; preserve likeness
+- Clothing simplified and readable; avoid tiny details
+- Background simple and whimsical (flat shapes, soft clouds, tiny stars when night), uncluttered
+- Overall vibe: warm "bedtime story" look similar to modern PBS Kids storybooks
+Hard rules: no photorealism, no sketchy pencil lines, no anime/manga look, no halftone/comic dots.
 `;
 
 function pngBlobFromB64(b64: string): Blob {
