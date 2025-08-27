@@ -153,7 +153,7 @@ const Home = () => {
               <p className="text-muted-foreground">Stories picked based on your age and interests</p>
             </div>
             <Button variant="outline" className="font-fredoka">
-              <Link to="/search">View All Stories</Link>
+              <Link to="/explore">View All Stories</Link>
             </Button>
           </div>
 
@@ -219,7 +219,7 @@ const Home = () => {
           </div>
 
           <div className="text-center mt-12">
-            <Link to="/search">
+            <Link to="/explore">
               <Button size="lg" className="font-fredoka">
                 Explore More Stories
               </Button>

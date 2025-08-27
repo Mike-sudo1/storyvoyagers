@@ -27,7 +27,6 @@ const Header = () => {
   const authenticatedNavigation = [
     { name: "Home", href: "/", icon: Home },
     { name: "Explore", href: "/explore", icon: Compass },
-    { name: "Search", href: "/search", icon: Search },
     { name: "Library", href: "/library", icon: Library },
     { name: "Create", href: "/create-story", icon: Plus },
   ];
