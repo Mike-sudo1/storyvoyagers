@@ -1,6 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// ✅ Safe base64 encoder (no spread operator)
+import { encode as b64encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,37 +10,39 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const STYLE_PROMPT = `Transform this photo into a cozy children's-book illustration with the following style:
+// Max image size you’ll accept (tune as needed)
+const MAX_BYTES = 12 * 1024 * 1024; // 12 MB
+
+const STYLE_PROMPT = `Stylize THIS EXACT PHOTO into a cozy children's-book illustration while preserving the subject's identity and scene.
+
+STYLE
 - Clean, bold outlines (consistent line weight), smooth vector-like shapes
 - Bright but gentle colors with soft gradients (no harsh shadows)
 - Childlike proportions: slightly oversized head, rounded features
-- Overall vibe: warm "bedtime story" look similar to modern PBS Kids storybooks
-Hard rules: no photorealism, no sketchy pencil lines, no anime/manga look, no halftone/comic dots.
+- Warm "bedtime story" vibe similar to modern PBS Kids storybooks
+- Background simplified and uncluttered (flat shapes, soft clouds, tiny stars if night)
 
-Faithful likeness & analysis (very important):
-- Preserve the person's DISTINCT features from the photo: face shape, eye shape/spacing, nose shape/size, mouth shape, eyebrow thickness/angle, ear shape, and skin tone.
-- Keep the exact HAIRSTYLE (length, part, curls/texture), hairline, and color.
-- Match CLOTHING colors/patterns and key accessories (glasses, headbands, hats, earrings).
-- Follow the same POSE, head tilt, and camera angle as the input photo.
-- Maintain the same LIGHTING direction and key highlights/shadows (translate into soft, storybook shading).
-- Include any SIGNATURE props or background anchors that frame the person (e.g., telescope, distinctive furniture) but simplify them to flat, uncluttered shapes.
-- Use the photo as the source of truth; DO NOT replace features with generic or idealized ones.
+STRICT LIKENESS (highest priority — use the input photo as the structural reference)
+- Preserve the subject’s DISTINCT facial geometry: overall face shape, eye shape/spacing, nose width/length, mouth shape, eyebrow thickness/angle, ears
+- Keep the exact HAIRSTYLE (length, part, curl/texture), hairline, and natural hair color
+- Match true SKIN TONE and undertone (do not lighten or darken)
+- Copy CLOTHING colors/patterns, logos/graphics, and accessories (glasses, headbands, hats, earrings)
+- Keep the same POSE, head tilt, camera angle, and FOV as the photo
+- Maintain LIGHTING direction and key highlight/shadow placements, translated into soft storybook shading
+- Include key SCENE ANCHORS (e.g., telescope, furniture) simplified into flat, readable shapes
+- Use the input photo’s color palette when possible
+
+DO NOT
+- Do not replace features with generic/idealized ones
+- Do not change hair color, skin tone, or clothing colors
+- Do not invent new backgrounds or props unless missing; prefer simplifying what’s present
+- No photorealism, no sketchy pencil lines, no anime/manga look, no halftone/comic dots
 `;
+
 
 function pngBlobFromB64(b64: string): Blob {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   return new Blob([bytes], { type: "image/png" });
-}
-
-// ---- safe base64 encoder without huge spread (unchanged) ----
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunkSize = 0x8000; // 32KB chunks
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
 }
 
 serve(async (req) => {
@@ -84,6 +88,16 @@ serve(async (req) => {
       });
     }
 
+    // 🚫 Bail out early on huge files (prevents memory spikes/timeouts)
+    if (file.size > MAX_BYTES) {
+      return new Response(
+        JSON.stringify({
+          error: `Image too large (${(file.size/1024/1024).toFixed(1)}MB). Max ${MAX_BYTES/1024/1024}MB. Please upload a smaller image or downscale on the client.`,
+        }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
     if (!OPENAI_API_KEY) {
       return new Response(JSON.stringify({ error: "Missing OPENAI_API_KEY" }), {
@@ -92,11 +106,13 @@ serve(async (req) => {
       });
     }
 
-    // Convert uploaded file to base64 (safe for large files)
-    const arrayBuffer = await file.arrayBuffer();
-    const base64Image = bytesToBase64(new Uint8Array(arrayBuffer));
+    // ✅ SAFE: base64 encode without spread (handles big images)
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const base64Image = b64encode(bytes);
+    const mime = file.type || "image/jpeg";
+    const dataUrl = `data:${mime};base64,${base64Image}`;
 
-    // Call OpenAI edit endpoint
+    // Call OpenAI edit endpoint (JSON only for gpt-image-1)
     const openAIResponse = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",
       headers: {
@@ -105,7 +121,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "gpt-image-1",
-        image: `data:image/${file.type.split("/")[1]};base64,${base64Image}`,
+        image: dataUrl,
         prompt: STYLE_PROMPT,
         n: 1,
         size: "1024x1024",
@@ -120,7 +136,7 @@ serve(async (req) => {
       if (!b64) throw new Error("OpenAI edit: missing b64_json");
       imageBlob = pngBlobFromB64(b64);
     } else {
-      // Fallback: generate (does not preserve photo likeness, but keeps style)
+      // Fallback: generation (style preserved, likeness may not be)
       const genResponse = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
@@ -149,7 +165,6 @@ serve(async (req) => {
     const { error: uploadError } = await supabase.storage
       .from("avatars")
       .upload(fileName, imageBlob, { contentType: "image/png", upsert: true });
-
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = await supabase.storage.from("avatars").getPublicUrl(fileName);
@@ -161,19 +176,14 @@ serve(async (req) => {
       .update({ avatar_url: avatarUrl })
       .eq("id", childId)
       .eq("user_id", user.id);
-
     if (updateError) throw updateError;
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        avatarUrl,
-        message: "Photo cartoonified successfully!",
-      }),
+      JSON.stringify({ success: true, avatarUrl, message: "Photo cartoonified successfully!" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: any) {
-    console.error("Error:", error);
+    console.error("Error:", error?.message || String(error));
     return new Response(JSON.stringify({ error: error?.message || "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
