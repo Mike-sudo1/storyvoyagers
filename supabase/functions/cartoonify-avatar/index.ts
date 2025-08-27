@@ -1,12 +1,17 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// ✅ Safe base64 encoder (no spread operator)
+import { encode as b64encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// Max image size you’ll accept (tune as needed)
+const MAX_BYTES = 12 * 1024 * 1024; // 12 MB
 
 const STYLE_PROMPT = `
 Transform this photo into a cozy children's-book illustration with the following style:
@@ -68,6 +73,16 @@ serve(async (req) => {
       });
     }
 
+    // 🚫 Bail out early on huge files (prevents memory spikes/timeouts)
+    if (file.size > MAX_BYTES) {
+      return new Response(
+        JSON.stringify({
+          error: `Image too large (${(file.size/1024/1024).toFixed(1)}MB). Max ${MAX_BYTES/1024/1024}MB. Please upload a smaller image or downscale on the client.`,
+        }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
     if (!OPENAI_API_KEY) {
       return new Response(JSON.stringify({ error: "Missing OPENAI_API_KEY" }), {
@@ -76,11 +91,13 @@ serve(async (req) => {
       });
     }
 
-    // Convert uploaded file to base64
-    const arrayBuffer = await file.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    // ✅ SAFE: base64 encode without spread (handles big images)
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const base64Image = b64encode(bytes);
+    const mime = file.type || "image/jpeg";
+    const dataUrl = `data:${mime};base64,${base64Image}`;
 
-    // Call OpenAI edit endpoint
+    // Call OpenAI edit endpoint (JSON only for gpt-image-1)
     const openAIResponse = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",
       headers: {
@@ -89,7 +106,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "gpt-image-1",
-        image: `data:image/${file.type.split("/")[1]};base64,${base64Image}`,
+        image: dataUrl,
         prompt: STYLE_PROMPT,
         n: 1,
         size: "1024x1024",
@@ -104,7 +121,7 @@ serve(async (req) => {
       if (!b64) throw new Error("OpenAI edit: missing b64_json");
       imageBlob = pngBlobFromB64(b64);
     } else {
-      // Fallback: generate (does not preserve photo likeness, but keeps style)
+      // Fallback: generation (style preserved, likeness may not be)
       const genResponse = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
@@ -133,7 +150,6 @@ serve(async (req) => {
     const { error: uploadError } = await supabase.storage
       .from("avatars")
       .upload(fileName, imageBlob, { contentType: "image/png", upsert: true });
-
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = await supabase.storage.from("avatars").getPublicUrl(fileName);
@@ -145,19 +161,14 @@ serve(async (req) => {
       .update({ avatar_url: avatarUrl })
       .eq("id", childId)
       .eq("user_id", user.id);
-
     if (updateError) throw updateError;
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        avatarUrl,
-        message: "Photo cartoonified successfully!",
-      }),
+      JSON.stringify({ success: true, avatarUrl, message: "Photo cartoonified successfully!" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: any) {
-    console.error("Error:", error);
+    console.error("Error:", error?.message || String(error));
     return new Response(JSON.stringify({ error: error?.message || "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
