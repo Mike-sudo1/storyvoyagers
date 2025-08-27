@@ -1,6 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// ✅ safe base64 encoder (handles large files without call stack overflow)
+import { encode as b64encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,9 +77,9 @@ serve(async (req) => {
       });
     }
 
-    // Convert uploaded file to base64
-    const arrayBuffer = await file.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    // ✅ Convert uploaded file to base64 (safe for large files)
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const base64Image = b64encode(bytes);
 
     // Call OpenAI edit endpoint
     const openAIResponse = await fetch("https://api.openai.com/v1/images/edits", {
