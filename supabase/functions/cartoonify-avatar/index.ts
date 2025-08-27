@@ -1,18 +1,20 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// ✅ Safe base64 encoder (no spread operator)
 import { encode as b64encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
+// ---------- CORS (return these headers on EVERY path) ----------
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, Authorization, x-client-info, apikey, content-type",
 };
 
-// Max image size you’ll accept (tune as needed)
+// Max image size you’ll accept (adjust if needed)
 const MAX_BYTES = 12 * 1024 * 1024; // 12 MB
 
+// ---------- Style prompt ----------
 const STYLE_PROMPT = `
 Transform this photo into a cozy children's-book illustration with the following style:
 - Clean, bold outlines (consistent line weight), smooth vector-like shapes
@@ -25,14 +27,16 @@ Transform this photo into a cozy children's-book illustration with the following
 Hard rules: no photorealism, no sketchy pencil lines, no anime/manga look, no halftone/comic dots.
 `;
 
+// Convert base64 PNG string → Blob for upload
 function pngBlobFromB64(b64: string): Blob {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   return new Blob([bytes], { type: "image/png" });
 }
 
 serve(async (req) => {
+  // Preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
@@ -43,17 +47,17 @@ serve(async (req) => {
       });
     }
 
+    // Supabase client
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    // Auth
+    // Auth (bearer from client)
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     const user = userData?.user;
-
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -61,7 +65,7 @@ serve(async (req) => {
       });
     }
 
-    // Inputs
+    // Read multipart form
     const formData = await req.formData();
     const file = formData.get("image") as File | null;
     const childId = (formData.get("childId") as string | null)?.trim();
@@ -73,11 +77,13 @@ serve(async (req) => {
       });
     }
 
-    // 🚫 Bail out early on huge files (prevents memory spikes/timeouts)
+    // Guard extremely large files early
     if (file.size > MAX_BYTES) {
       return new Response(
         JSON.stringify({
-          error: `Image too large (${(file.size/1024/1024).toFixed(1)}MB). Max ${MAX_BYTES/1024/1024}MB. Please upload a smaller image or downscale on the client.`,
+          error: `Image too large (${(file.size / 1024 / 1024).toFixed(
+            1,
+          )}MB). Max ${(MAX_BYTES / 1024 / 1024).toFixed(0)}MB.`,
         }),
         { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -91,14 +97,16 @@ serve(async (req) => {
       });
     }
 
-    // ✅ SAFE: base64 encode without spread (handles big images)
+    // SAFE base64 (no spread → no stack overflow)
     const bytes = new Uint8Array(await file.arrayBuffer());
     const base64Image = b64encode(bytes);
     const mime = file.type || "image/jpeg";
     const dataUrl = `data:${mime};base64,${base64Image}`;
 
-    // Call OpenAI edit endpoint (JSON only for gpt-image-1)
-    const openAIResponse = await fetch("https://api.openai.com/v1/images/edits", {
+    // --- OpenAI edit call (JSON only for gpt-image-1) ---
+    let imageBlob: Blob;
+
+    const editResp = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -113,16 +121,14 @@ serve(async (req) => {
       }),
     });
 
-    let imageBlob: Blob;
-
-    if (openAIResponse.ok) {
-      const result = await openAIResponse.json();
-      const b64 = result?.data?.[0]?.b64_json;
+    if (editResp.ok) {
+      const json = await editResp.json();
+      const b64 = json?.data?.[0]?.b64_json;
       if (!b64) throw new Error("OpenAI edit: missing b64_json");
       imageBlob = pngBlobFromB64(b64);
     } else {
-      // Fallback: generation (style preserved, likeness may not be)
-      const genResponse = await fetch("https://api.openai.com/v1/images/generations", {
+      // Fallback: style-consistent generation (won't preserve likeness as well)
+      const genResp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -136,16 +142,16 @@ serve(async (req) => {
         }),
       });
 
-      const genJson = await genResponse.json();
-      if (!genResponse.ok) {
-        throw new Error(`OpenAI API error: ${genJson?.error?.message || "Unknown error"}`);
+      const genJson = await genResp.json();
+      if (!genResp.ok) {
+        throw new Error(genJson?.error?.message || "OpenAI generation failed");
       }
       const b64 = genJson?.data?.[0]?.b64_json;
       if (!b64) throw new Error("OpenAI generation: missing b64_json");
       imageBlob = pngBlobFromB64(b64);
     }
 
-    // Upload to Supabase
+    // Upload to Supabase Storage
     const fileName = `${user.id}/${childId}_avatar_${Date.now()}.png`;
     const { error: uploadError } = await supabase.storage
       .from("avatars")
@@ -155,7 +161,7 @@ serve(async (req) => {
     const { data: publicUrlData } = await supabase.storage.from("avatars").getPublicUrl(fileName);
     const avatarUrl = publicUrlData.publicUrl;
 
-    // Update child profile
+    // Update DB
     const { error: updateError } = await supabase
       .from("children")
       .update({ avatar_url: avatarUrl })
