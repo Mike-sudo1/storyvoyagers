@@ -26,19 +26,18 @@ STRICT LIKENESS (highest priority — use the input photo as the structural refe
 - Preserve the subject’s DISTINCT facial geometry: overall face shape, eye shape/spacing, nose width/length, mouth shape, eyebrow thickness/angle, ears
 - Keep the exact HAIRSTYLE (length, part, curl/texture), hairline, and natural hair color
 - Match true SKIN TONE and undertone (do not lighten or darken)
-- Copy CLOTHING colors/patterns, logos/graphics, and accessories (glasses, headbands, hats, earrings)
+- Copy CLOTHING colors/patterns and accessories (glasses, headbands, hats, earrings)
 - Keep the same POSE, head tilt, camera angle, and FOV as the photo
 - Maintain LIGHTING direction and key highlight/shadow placements, translated into soft storybook shading
-- Include key SCENE ANCHORS (e.g., telescope, furniture) simplified into flat, readable shapes
+- Include key SCENE ANCHORS (e.g., telescope, distinctive furniture) simplified into flat, readable shapes
 - Use the input photo’s color palette when possible
 
 DO NOT
 - Do not replace features with generic/idealized ones
 - Do not change hair color, skin tone, or clothing colors
-- Do not invent new backgrounds or props unless missing; prefer simplifying what’s present
+- Do not invent new backgrounds or props unless missing; prefer simplifying what's present
 - No photorealism, no sketchy pencil lines, no anime/manga look, no halftone/comic dots
 `;
-
 
 function pngBlobFromB64(b64: string): Blob {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
