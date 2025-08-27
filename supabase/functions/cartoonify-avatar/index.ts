@@ -54,7 +54,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         image: `data:image/${file.type.split('/')[1]};base64,${base64Image}`,
-        prompt: "Transform this child's photo into a friendly, colorful cartoon avatar suitable for children's storybooks. Keep the facial features recognizable but make it animated and child-friendly with bright colors and a cheerful expression.",
+        prompt: "Transform this child's photo into a cute children's book style illustration. Use bright, warm colors, soft shading, and clean bold outlines. The character should have large expressive eyes, rounded facial features, and a friendly smile. Keep proportions simplified and slightly exaggerated in a cartoon way. The background should be simple, with flat colors, smooth gradients, and a whimsical atmosphere. Keep the facial features recognizable.",
         n: 1,
         size: "512x512",
         response_format: "url"
@@ -70,7 +70,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: "A friendly cartoon avatar of a child for a storybook, colorful and cheerful, simple cartoon style, smiling face, suitable for children's educational content",
+          prompt: "A cute children's book style illustration of a child character. Use bright, warm colors, soft shading, and clean bold outlines. The character should have large expressive eyes, rounded facial features, and a friendly smile. Keep proportions simplified and slightly exaggerated in a cartoon way. The background should be simple, with flat colors, smooth gradients, and a whimsical atmosphere.",
           n: 1,
           size: "512x512",
           response_format: "url"
