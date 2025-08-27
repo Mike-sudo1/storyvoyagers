@@ -77,7 +77,7 @@ serve(async (req) => {
       });
     }
 
-    // Guard extremely large files early
+    // Guard extremely large files early (prevents memory spikes/timeouts)
     if (file.size > MAX_BYTES) {
       return new Response(
         JSON.stringify({
