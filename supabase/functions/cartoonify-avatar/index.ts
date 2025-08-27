@@ -1,8 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// ✅ safe base64 encoder (handles large files without call stack overflow)
-import { encode as b64encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +22,18 @@ Hard rules: no photorealism, no sketchy pencil lines, no anime/manga look, no ha
 function pngBlobFromB64(b64: string): Blob {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   return new Blob([bytes], { type: "image/png" });
+}
+
+// ---- ONLY CHANGE: safe base64 encoder without huge spread ----
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000; // 32KB chunks
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    // small, safe spread per chunk
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
 }
 
 serve(async (req) => {
@@ -77,9 +87,9 @@ serve(async (req) => {
       });
     }
 
-    // ✅ Convert uploaded file to base64 (safe for large files)
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const base64Image = b64encode(bytes);
+    // Convert uploaded file to base64 (safe for large files)
+    const arrayBuffer = await file.arrayBuffer();
+    const base64Image = bytesToBase64(new Uint8Array(arrayBuffer));
 
     // Call OpenAI edit endpoint
     const openAIResponse = await fetch("https://api.openai.com/v1/images/edits", {
