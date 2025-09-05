@@ -11,8 +11,10 @@ import {
   Sparkles,
   Bookmark
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface StoryPreviewProps {
+  id?: string;
   title: string;
   subject: string;
   ageRange: string;
@@ -27,20 +29,28 @@ interface StoryPreviewProps {
   isLoading?: boolean;
 }
 
-const StoryPreview = ({
-  title,
-  subject,
-  ageRange,
-  duration,
-  rating,
-  description,
-  coverImage,
+const StoryPreview = ({ 
+  id,
+  title, 
+  subject, 
+  ageRange, 
+  duration, 
+  rating, 
+  description, 
+  coverImage, 
   isPremium = false,
   isDownloaded = false,
   onSave,
   isSaved = false,
   isLoading = false
 }: StoryPreviewProps) => {
+  const navigate = useNavigate();
+
+  const handleReadStory = () => {
+    if (id) {
+      navigate(`/story/${id}`);
+    }
+  };
   return (
     <Card className="group hover-lift bg-gradient-card border-0 shadow-soft hover:shadow-card transition-smooth overflow-hidden">
       {/* Cover Image */}
@@ -132,7 +142,8 @@ const StoryPreview = ({
             variant="hero" 
             size="sm" 
             className="flex-1 text-xs"
-            onClick={() => alert("Story placeholder")}
+            onClick={handleReadStory}
+            disabled={!id}
           >
             Read Story
           </Button>

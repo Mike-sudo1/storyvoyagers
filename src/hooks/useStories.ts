@@ -21,6 +21,27 @@ export const useStories = () => {
   });
 };
 
+export const useStory = (storyId: string) => {
+  return useQuery({
+    queryKey: ['story', storyId],
+    queryFn: async () => {
+      if (!supabase || !storyId) {
+        throw new Error('Supabase not connected or no story ID');
+      }
+      
+      const { data, error } = await (supabase as any)
+        .from('stories')
+        .select('*')
+        .eq('id', storyId)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!storyId
+  });
+};
+
 export const useSaveStory = () => {
   const queryClient = useQueryClient();
   

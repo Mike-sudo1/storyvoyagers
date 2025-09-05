@@ -169,9 +169,12 @@ export type Database = {
           genre: string | null
           id: string
           is_premium: boolean | null
+          is_template: boolean | null
           language: string | null
+          original_content: string | null
           reading_time: number | null
           subject: string
+          template_content: Json | null
           title: string
           updated_at: string
         }
@@ -186,9 +189,12 @@ export type Database = {
           genre?: string | null
           id?: string
           is_premium?: boolean | null
+          is_template?: boolean | null
           language?: string | null
+          original_content?: string | null
           reading_time?: number | null
           subject: string
+          template_content?: Json | null
           title: string
           updated_at?: string
         }
@@ -203,9 +209,12 @@ export type Database = {
           genre?: string | null
           id?: string
           is_premium?: boolean | null
+          is_template?: boolean | null
           language?: string | null
+          original_content?: string | null
           reading_time?: number | null
           subject?: string
+          template_content?: Json | null
           title?: string
           updated_at?: string
         }

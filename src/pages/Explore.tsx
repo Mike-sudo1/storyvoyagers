@@ -176,21 +176,22 @@ const Explore = () => {
 
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredStories.map((story: any) => (
-                  <StoryPreview 
-                    key={story.id}
-                    title={story.title}
-                    subject={story.subject}
-                    ageRange={`Ages ${story.age_min}-${story.age_max}`}
-                    duration={`${story.reading_time || 10} min`}
-                    rating={4.8} // Default rating since not in DB yet
-                    description={story.description || "An exciting educational adventure!"}
-                    coverImage={story.cover_image_url}
-                    isPremium={story.is_premium}
-                    isDownloaded={false}
-                    onSave={() => handleSaveToggle(story.id)}
-                    isSaved={isStorySaved(story.id)}
-                    isLoading={saveToLibrary.isPending || removeFromLibrary.isPending}
-                  />
+                <StoryPreview 
+                  key={story.id}
+                  id={story.id}
+                  title={story.title}
+                  subject={story.subject}
+                  ageRange={`Ages ${story.age_min}-${story.age_max}`}
+                  duration={`${story.reading_time || 10} min`}
+                  rating={4.8} // Default rating since not in DB yet
+                  description={story.description || "An exciting educational adventure!"}
+                  coverImage={story.cover_image_url}
+                  isPremium={story.is_premium}
+                  isDownloaded={false}
+                  onSave={() => handleSaveToggle(story.id)}
+                  isSaved={isStorySaved(story.id)}
+                  isLoading={saveToLibrary.isPending || removeFromLibrary.isPending}
+                />
                 ))}
               </div>
 
