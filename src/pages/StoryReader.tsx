@@ -11,6 +11,11 @@ import { useChildren } from "@/hooks/useChildren";
 import { usePersonalization } from "@/hooks/usePersonalization";
 import { ChildSelector } from "@/components/ChildSelector";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import threePigsPage1 from "@/assets/three-pigs-page1.jpg";
+import threePigsPage2 from "@/assets/three-pigs-page2.jpg";
+import threePigsPage3 from "@/assets/three-pigs-page3.jpg";
+import threePigsPage4 from "@/assets/three-pigs-page4.jpg";
+import threePigsPage5 from "@/assets/three-pigs-page5.jpg";
 
 interface Child {
   id: string;
@@ -103,6 +108,22 @@ const StoryReader = () => {
     setCurrentPage(Math.min(storyPages.length - 1, currentPage + 1));
   };
 
+  // Map page numbers to story images (for Three Little Pigs)
+  const getStoryImage = (pageIndex: number) => {
+    const imageMap: { [key: number]: string } = {
+      0: threePigsPage1,
+      1: threePigsPage2,
+      2: threePigsPage3,
+      3: threePigsPage4,
+      4: threePigsPage5,
+    };
+    return imageMap[pageIndex];
+  };
+
+  const currentIllustration = personalizedStory.illustrations?.find(
+    ill => ill.page === currentPage + 1
+  );
+
   return (
     <div className="min-h-screen">
       <Header />
@@ -165,20 +186,26 @@ const StoryReader = () => {
                 </p>
               </div>
 
-              {/* Avatar illustration placeholder */}
-              {selectedChild?.avatar_url && (
-                <div className="flex justify-center mb-8">
-                  <div className="relative">
-                    <Avatar className="h-32 w-32 border-4 border-primary/20">
-                      <AvatarImage src={selectedChild.avatar_url} />
-                      <AvatarFallback>
-                        <User className="h-16 w-16" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="absolute -bottom-2 -right-2 bg-primary text-primary-foreground rounded-full p-2">
-                      <BookOpen className="h-4 w-4" />
+              {/* Story illustration with child avatar integration */}
+              {getStoryImage(currentPage) && (
+                <div className="relative mb-8 mx-auto max-w-2xl">
+                  <img 
+                    src={getStoryImage(currentPage)} 
+                    alt={currentIllustration?.description || `Story illustration for page ${currentPage + 1}`}
+                    className="w-full h-auto rounded-lg shadow-lg"
+                  />
+                  
+                  {/* Child avatar overlay */}
+                  {selectedChild?.avatar_url && currentIllustration?.placeholder_avatar && (
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                      <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
+                        <AvatarImage src={selectedChild.avatar_url} />
+                        <AvatarFallback>
+                          <User className="h-12 w-12" />
+                        </AvatarFallback>
+                      </Avatar>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
