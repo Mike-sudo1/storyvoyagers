@@ -124,6 +124,18 @@ const StoryReader = () => {
     ill => ill.page === currentPage + 1
   );
 
+  // Avatar positioning for each page (optimized for character bodies)
+  const getAvatarPosition = (pageIndex: number) => {
+    const positionMap: { [key: number]: { top: string; left: string; size: string } } = {
+      0: { top: '35%', left: '45%', size: 'h-16 w-16' }, // Planning scene - character in center
+      1: { top: '32%', left: '42%', size: 'h-16 w-16' }, // Building straw house
+      2: { top: '30%', left: '48%', size: 'h-16 w-16' }, // Building stick house  
+      3: { top: '28%', left: '46%', size: 'h-16 w-16' }, // Building brick house
+      4: { top: '35%', left: '25%', size: 'h-16 w-16' }, // Safe in house - character on left side
+    };
+    return positionMap[pageIndex] || { top: '50%', left: '50%', size: 'h-16 w-16' };
+  };
+
   return (
     <div className="min-h-screen">
       <Header />
@@ -197,11 +209,17 @@ const StoryReader = () => {
                   
                   {/* Child avatar overlay */}
                   {selectedChild?.avatar_url && currentIllustration?.placeholder_avatar && (
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                      <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
+                    <div 
+                      className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                      style={{
+                        top: getAvatarPosition(currentPage).top,
+                        left: getAvatarPosition(currentPage).left
+                      }}
+                    >
+                      <Avatar className={`${getAvatarPosition(currentPage).size} border-2 border-white shadow-lg`}>
                         <AvatarImage src={selectedChild.avatar_url} />
                         <AvatarFallback>
-                          <User className="h-12 w-12" />
+                          <User className="h-8 w-8" />
                         </AvatarFallback>
                       </Avatar>
                     </div>
