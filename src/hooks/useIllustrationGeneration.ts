@@ -14,6 +14,7 @@ interface ChildFeatures {
 interface GenerateIllustrationParams {
   prompt: string;
   childFeatures: ChildFeatures;
+  avatarUrl?: string;
   style?: string;
   size?: string;
 }
@@ -31,6 +32,7 @@ export const useIllustrationGeneration = () => {
         body: {
           prompt: params.prompt,
           childFeatures: params.childFeatures,
+          avatarUrl: params.avatarUrl,
           style: params.style || 'cartoon',
           size: params.size || '1024x768'
         }

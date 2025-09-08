@@ -19,6 +19,7 @@ interface GenerationRequest {
     eyeColor: string;
     faceShape: string;
   };
+  avatarUrl?: string;
   style?: string;
   size?: string;
 }
@@ -33,7 +34,7 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not configured');
     }
 
-    const { prompt, childFeatures, style = 'cartoon', size = '1024x768' }: GenerationRequest = await req.json();
+    const { prompt, childFeatures, avatarUrl, style = 'cartoon', size = '1024x768' }: GenerationRequest = await req.json();
 
     if (!prompt || !childFeatures) {
       return new Response(
@@ -42,8 +43,12 @@ serve(async (req) => {
       );
     }
 
-    // Create personalized prompt with child's features
-    const personalizedPrompt = `${style} illustration of ${prompt}. The main character is a ${childFeatures.age}-year-old child named ${childFeatures.name} with ${childFeatures.skinTone} skin, ${childFeatures.hairColor} ${childFeatures.hairStyle} hair, ${childFeatures.eyeColor} eyes, and ${childFeatures.faceShape} face shape. The character should be fully illustrated as a unified drawing with these facial features naturally integrated into the character design - not a cut-out face or overlay. High quality, child-friendly, storybook illustration style.`;
+    // Create personalized prompt with child's features and avatar reference
+    const childDescription = `${childFeatures.name} (age ${childFeatures.age}) with ${childFeatures.skinTone} skin, ${childFeatures.hairColor} ${childFeatures.hairStyle} hair, ${childFeatures.eyeColor} eyes, and ${childFeatures.faceShape} face shape`;
+    
+    const personalizedPrompt = `${prompt.trim()}
+
+The character of the child in this image should be fully illustrated based on the child's appearance: ${childDescription}. ${avatarUrl ? `Use the child's facial features from this reference image as the basis for the main character in the scene: ${avatarUrl}. ` : ''}The child should be naturally integrated into the scene's character art using ${style} storybook illustration style. Do not use a floating avatar or placeholder circle - create a complete, unified illustration with the child embedded as the main character. High quality, child-friendly artwork.`.trim();
 
     console.log('Generating illustration with prompt:', personalizedPrompt);
 

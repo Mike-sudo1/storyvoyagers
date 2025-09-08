@@ -9,6 +9,7 @@ import { ArrowLeft, BookOpen, User } from "lucide-react";
 import { useStory } from "@/hooks/useStories";
 import { useChildren } from "@/hooks/useChildren";
 import { usePersonalization } from "@/hooks/usePersonalization";
+import { useIllustrationGeneration } from "@/hooks/useIllustrationGeneration";
 import { ChildSelector } from "@/components/ChildSelector";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import threePigsPage1 from "@/assets/three-pigs-page1.jpg";
@@ -39,6 +40,7 @@ const StoryReader = () => {
   const { data: story, isLoading: storyLoading } = useStory(storyId!);
   const { data: children, isLoading: childrenLoading } = useChildren();
   const { personalizeStory } = usePersonalization();
+  const { generateIllustration, extractChildFeatures, isGenerating } = useIllustrationGeneration();
 
   if (storyLoading || childrenLoading) {
     return (
@@ -139,6 +141,19 @@ const StoryReader = () => {
 
   // Check if story has integrated character illustrations (no overlay needed)
   const hasIntegratedIllustrations = story.id !== 'three-little-pigs' && personalizedStory.illustrations?.length > 0;
+
+  // Generate personalized illustration for current page
+  const handleGenerateIllustration = async () => {
+    if (!currentIllustration || !selectedChild) return null;
+    
+    const childFeatures = extractChildFeatures(selectedChild);
+    return await generateIllustration({
+      prompt: currentIllustration.description,
+      childFeatures,
+      avatarUrl: selectedChild.avatar_url,
+      style: 'cartoon'
+    });
+  };
 
   return (
     <div className="min-h-screen">
