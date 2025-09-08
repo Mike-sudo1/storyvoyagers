@@ -88,24 +88,47 @@ const StoryReader = () => {
 
   // Handle personalized image generation
   const loadPersonalizedImage = async (pageIndex: number) => {
-    if (!story?.cover_image_url || !selectedChild?.avatar_url) return;
+    if (!selectedChild?.avatar_url) return;
 
-    const cacheKey = `${story.id}_${pageIndex}`;
+    const cacheKey = `${story?.id}_${pageIndex}`;
 
+    // Check if we have a cached image for this specific story/page combination
     if (personalizedImages[cacheKey]) {
       setCurrentImageUrl(personalizedImages[cacheKey]);
       return;
     }
 
-    if (story.title?.includes("Pyramid Puzzle") || story.description?.includes("blank face")) {
+    // Get the illustration data for current page
+    const illustration = personalizedStory.illustrations?.find(ill => ill.page === pageIndex + 1);
+    
+    // Determine the base image to use for personalization
+    let baseImageUrl = null;
+    
+    // Priority 1: Use image_url from illustration if defined
+    if (illustration?.image_url || illustration?.image) {
+      baseImageUrl = illustration.image_url || illustration.image;
+    }
+    // Priority 2: Fallback to story cover image
+    else if (story?.cover_image_url) {
+      baseImageUrl = story.cover_image_url;
+    }
+    
+    // Only proceed with personalization if we have a base image
+    if (baseImageUrl && (story?.title?.includes("Pyramid Puzzle") || story?.description?.includes("blank face") || illustration?.placeholder_avatar)) {
       setLoadingImage(true);
       
       try {
         const pageText = storyPages[pageIndex] || '';
         const emotion = getEmotionForScene(pageText, pageIndex);
         
+        console.log(`Personalizing image for page ${pageIndex + 1}:`, {
+          baseImageUrl,
+          hasIllustrationImage: !!(illustration?.image_url || illustration?.image),
+          emotion
+        });
+        
         const personalizedImageUrl = await personalizeImage({
-          storyImageUrl: story.cover_image_url,
+          storyImageUrl: baseImageUrl,
           childAvatarUrl: selectedChild.avatar_url,
           childId: selectedChild.id,
           storyId: story.id,
@@ -125,6 +148,10 @@ const StoryReader = () => {
       } finally {
         setLoadingImage(false);
       }
+    } 
+    // If illustration has image_url but no personalization needed, use it directly
+    else if (illustration?.image_url || illustration?.image) {
+      setCurrentImageUrl(illustration.image_url || illustration.image);
     }
   };
 
@@ -264,7 +291,7 @@ const StoryReader = () => {
               </div>
 
               {/* Story illustration */}
-              {(currentImageUrl || getStoryImage(currentPage)) && (
+              {(currentImageUrl || getStoryImage(currentPage) || currentIllustration?.image_url || currentIllustration?.image) && (
                 <div className="relative mb-8 mx-auto max-w-2xl">
                   {loadingImage && (
                     <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
@@ -277,7 +304,12 @@ const StoryReader = () => {
                   
                   {!loadingImage && (
                     <img 
-                      src={currentImageUrl || getStoryImage(currentPage)} 
+                      src={
+                        currentImageUrl || 
+                        currentIllustration?.image_url || 
+                        currentIllustration?.image || 
+                        getStoryImage(currentPage)
+                      } 
                       alt={currentIllustration?.description || `Story illustration for page ${currentPage + 1}`}
                       className="w-full h-auto rounded-lg shadow-lg"
                     />
