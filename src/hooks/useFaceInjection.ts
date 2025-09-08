@@ -137,16 +137,17 @@ function detectBlankFaceCircle(ctx: CanvasRenderingContext2D, width: number, hei
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
 
-  // Heuristic: scan a head region (upper middle third) for a large, light, uniform circular area
-  const scanX0 = Math.floor(width * 0.25);
-  const scanX1 = Math.floor(width * 0.75);
-  const scanY0 = Math.floor(height * 0.10);
-  const scanY1 = Math.floor(height * 0.55);
+  // Look specifically for pure white (#ffffff) or near-white circular areas
+  const scanX0 = Math.floor(width * 0.15);
+  const scanX1 = Math.floor(width * 0.85);
+  const scanY0 = Math.floor(height * 0.05);
+  const scanY1 = Math.floor(height * 0.70);
 
   let minX = width, maxX = 0, minY = height, maxY = 0;
   let samples = 0;
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 512));
 
-  const step = Math.max(2, Math.floor(Math.min(width, height) / 256));
+  console.log(`Scanning for white circle in bounds: ${scanX0}-${scanX1} x ${scanY0}-${scanY1}`);
 
   for (let y = scanY0; y < scanY1; y += step) {
     for (let x = scanX0; x < scanX1; x += step) {
@@ -154,12 +155,14 @@ function detectBlankFaceCircle(ctx: CanvasRenderingContext2D, width: number, hei
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
+      const a = data[i + 3];
 
-      // Light, low-saturation threshold (placeholder circle is usually near-white/skin-tone)
-      const isLight = r > 210 && g > 200 && b > 190;
-      const lowSaturation = Math.abs(r - g) < 20 && Math.abs(g - b) < 20 && Math.abs(r - b) < 25;
-
-      if (isLight && lowSaturation) {
+      // Look for pure white or very close to white (allowing for slight compression artifacts)
+      const isPureWhite = r >= 250 && g >= 250 && b >= 250 && a > 200;
+      const isNearWhite = r >= 240 && g >= 240 && b >= 240 && 
+                         Math.abs(r - g) <= 15 && Math.abs(g - b) <= 15 && Math.abs(r - b) <= 15;
+      
+      if (isPureWhite || isNearWhite) {
         if (x < minX) minX = x; if (x > maxX) maxX = x;
         if (y < minY) minY = y; if (y > maxY) maxY = y;
         samples++;
@@ -167,15 +170,29 @@ function detectBlankFaceCircle(ctx: CanvasRenderingContext2D, width: number, hei
     }
   }
 
-  if (samples < 200) return null; // not enough pixels detected
+  console.log(`Found ${samples} white pixels in potential circle area`);
+
+  if (samples < 100) return null; // not enough white pixels detected
 
   const cx = Math.round((minX + maxX) / 2);
   const cy = Math.round((minY + maxY) / 2);
   const rx = (maxX - minX) / 2;
   const ry = (maxY - minY) / 2;
-  const r = Math.round(((rx + ry) / 2) * 0.95);
+  const r = Math.round((rx + ry) / 2);
 
-  if (r < 10) return null;
+  // Additional circular validation - check if the detected area is roughly circular
+  const aspectRatio = rx > 0 ? ry / rx : 1;
+  if (aspectRatio < 0.6 || aspectRatio > 1.7) {
+    console.log(`Area not circular enough, aspect ratio: ${aspectRatio}`);
+    return null;
+  }
+
+  if (r < 20) {
+    console.log(`Circle too small: radius ${r}`);
+    return null;
+  }
+
+  console.log(`Detected white circle at (${cx}, ${cy}) with radius ${r}`);
   return { x: cx, y: cy, r };
 }
 

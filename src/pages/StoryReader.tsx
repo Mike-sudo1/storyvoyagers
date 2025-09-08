@@ -123,27 +123,40 @@ const StoryReader = () => {
         const pageText = storyPages[pageIndex] || '';
         const emotion = getEmotionForScene(pageText, pageIndex);
         
-        console.log(`Injecting avatar for page ${pageIndex + 1}:`, {
-          baseImageUrl,
-          hasIllustrationImage: !!(illustration?.image_url || illustration?.image),
-          emotion
-        });
-        
-        const personalizedImageUrl = await injectAvatarIntoImage({
-          baseImageUrl,
-          avatarUrl: selectedChild.avatar_url,
-          childId: selectedChild.id,
-          storyId: story.id,
-          pageIndex,
-          emotion
-        });
-        
-        if (personalizedImageUrl) {
-          setPersonalizedImages(prev => ({
-            ...prev,
-            [cacheKey]: personalizedImageUrl
-          }));
-          setCurrentImageUrl(personalizedImageUrl);
+        // Only inject avatar if placeholder_avatar is true
+        if (illustration?.placeholder_avatar && selectedChild?.avatar_url) {
+          console.log(`Injecting avatar for page ${pageIndex + 1}:`, {
+            baseImageUrl,
+            hasIllustrationImage: !!(illustration?.image_url || illustration?.image),
+            emotion,
+            placeholderAvatar: illustration.placeholder_avatar
+          });
+          
+          const personalizedImageUrl = await injectAvatarIntoImage({
+            baseImageUrl,
+            avatarUrl: selectedChild.avatar_url,
+            childId: selectedChild.id,
+            storyId: story.id,
+            pageIndex,
+            emotion
+          });
+          
+          if (personalizedImageUrl) {
+            setPersonalizedImages(prev => ({
+              ...prev,
+              [cacheKey]: personalizedImageUrl
+            }));
+            setCurrentImageUrl(personalizedImageUrl);
+          }
+        } else {
+          console.log(`Skipping avatar injection for page ${pageIndex + 1}`, {
+            hasPlaceholderFlag: !!illustration?.placeholder_avatar,
+            hasAvatar: !!selectedChild?.avatar_url,
+            illustration: illustration ? { page: illustration.page, placeholder_avatar: illustration.placeholder_avatar } : null
+          });
+          
+          // If no personalization needed, use the base image directly
+          setCurrentImageUrl(baseImageUrl);
         }
       } catch (error) {
         console.error('Error injecting avatar:', error);
