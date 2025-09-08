@@ -11,6 +11,7 @@ import { useChildren } from "@/hooks/useChildren";
 import { usePersonalization } from "@/hooks/usePersonalization";
 import { useIllustrationGeneration } from "@/hooks/useIllustrationGeneration";
 import { usePersonalizedImage } from "@/hooks/usePersonalizedImage";
+import { useFaceInjection } from "@/hooks/useFaceInjection";
 import { ChildSelector } from "@/components/ChildSelector";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import threePigsPage1 from "@/assets/three-pigs-page1.jpg";
@@ -49,7 +50,8 @@ const StoryReader = () => {
   const { data: children, isLoading: childrenLoading } = useChildren();
   const { personalizeStory } = usePersonalization();
   const { generateIllustration, extractChildFeatures } = useIllustrationGeneration();
-  const { personalizeImage, getEmotionForScene } = usePersonalizedImage();
+  const { getEmotionForScene } = usePersonalizedImage();
+  const { injectAvatarIntoImage, isInjecting } = useFaceInjection();
 
   // Get personalized content - this needs to be computed before useEffect
   const getPersonalizedContent = () => {
@@ -114,22 +116,22 @@ const StoryReader = () => {
     }
     
     // Only proceed with personalization if we have a base image
-    if (baseImageUrl && (story?.title?.includes("Pyramid Puzzle") || story?.description?.includes("blank face") || illustration?.placeholder_avatar)) {
+    if (baseImageUrl) {
       setLoadingImage(true);
       
       try {
         const pageText = storyPages[pageIndex] || '';
         const emotion = getEmotionForScene(pageText, pageIndex);
         
-        console.log(`Personalizing image for page ${pageIndex + 1}:`, {
+        console.log(`Injecting avatar for page ${pageIndex + 1}:`, {
           baseImageUrl,
           hasIllustrationImage: !!(illustration?.image_url || illustration?.image),
           emotion
         });
         
-        const personalizedImageUrl = await personalizeImage({
-          storyImageUrl: baseImageUrl,
-          childAvatarUrl: selectedChild.avatar_url,
+        const personalizedImageUrl = await injectAvatarIntoImage({
+          baseImageUrl,
+          avatarUrl: selectedChild.avatar_url,
           childId: selectedChild.id,
           storyId: story.id,
           pageIndex,
@@ -144,12 +146,12 @@ const StoryReader = () => {
           setCurrentImageUrl(personalizedImageUrl);
         }
       } catch (error) {
-        console.error('Error loading personalized image:', error);
+        console.error('Error injecting avatar:', error);
       } finally {
         setLoadingImage(false);
       }
     } 
-    // If illustration has image_url but no personalization needed, use it directly
+    // If illustration has image_url but no personalization possible, use it directly
     else if (illustration?.image_url || illustration?.image) {
       setCurrentImageUrl(illustration.image_url || illustration.image);
     }
