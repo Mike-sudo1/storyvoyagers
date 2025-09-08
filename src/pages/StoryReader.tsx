@@ -16,6 +16,9 @@ import threePigsPage2 from "@/assets/three-pigs-page2.jpg";
 import threePigsPage3 from "@/assets/three-pigs-page3.jpg";
 import threePigsPage4 from "@/assets/three-pigs-page4.jpg";
 import threePigsPage5 from "@/assets/three-pigs-page5.jpg";
+import egyptPage1 from "@/assets/egypt-page1.jpg";
+import egyptPage2 from "@/assets/egypt-page2.jpg";
+import egyptPage3 from "@/assets/egypt-page3.jpg";
 
 interface Child {
   id: string;
@@ -108,8 +111,18 @@ const StoryReader = () => {
     setCurrentPage(Math.min(storyPages.length - 1, currentPage + 1));
   };
 
-  // Map page numbers to story images (for Three Little Pigs)
+  // Map page numbers to story images
   const getStoryImage = (pageIndex: number) => {
+    if (story.title === "Adventure in Ancient Egypt") {
+      const egyptImageMap: { [key: number]: string } = {
+        0: egyptPage1,
+        1: egyptPage2,
+        2: egyptPage3,
+      };
+      return egyptImageMap[pageIndex];
+    }
+    
+    // Default to Three Little Pigs images
     const imageMap: { [key: number]: string } = {
       0: threePigsPage1,
       1: threePigsPage2,
@@ -124,17 +137,8 @@ const StoryReader = () => {
     ill => ill.page === currentPage + 1
   );
 
-  // Avatar positioning for each page (optimized for character bodies)
-  const getAvatarPosition = (pageIndex: number) => {
-    const positionMap: { [key: number]: { top: string; left: string; size: string } } = {
-      0: { top: '35%', left: '45%', size: 'h-16 w-16' }, // Planning scene - character in center
-      1: { top: '32%', left: '42%', size: 'h-16 w-16' }, // Building straw house
-      2: { top: '30%', left: '48%', size: 'h-16 w-16' }, // Building stick house  
-      3: { top: '28%', left: '46%', size: 'h-16 w-16' }, // Building brick house
-      4: { top: '35%', left: '25%', size: 'h-16 w-16' }, // Safe in house - character on left side
-    };
-    return positionMap[pageIndex] || { top: '50%', left: '50%', size: 'h-16 w-16' };
-  };
+  // Check if story has integrated character illustrations (no overlay needed)
+  const hasIntegratedIllustrations = story.id !== 'three-little-pigs' && personalizedStory.illustrations?.length > 0;
 
   return (
     <div className="min-h-screen">
@@ -198,7 +202,7 @@ const StoryReader = () => {
                 </p>
               </div>
 
-              {/* Story illustration with child avatar integration */}
+              {/* Story illustration */}
               {getStoryImage(currentPage) && (
                 <div className="relative mb-8 mx-auto max-w-2xl">
                   <img 
@@ -207,16 +211,10 @@ const StoryReader = () => {
                     className="w-full h-auto rounded-lg shadow-lg"
                   />
                   
-                  {/* Child avatar overlay */}
-                  {selectedChild?.avatar_url && currentIllustration?.placeholder_avatar && (
-                    <div 
-                      className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                      style={{
-                        top: getAvatarPosition(currentPage).top,
-                        left: getAvatarPosition(currentPage).left
-                      }}
-                    >
-                      <Avatar className={`${getAvatarPosition(currentPage).size} border-2 border-white shadow-lg`}>
+                  {/* Legacy avatar overlay for Three Little Pigs only */}
+                  {!hasIntegratedIllustrations && selectedChild?.avatar_url && currentIllustration?.placeholder_avatar && (
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                      <Avatar className="h-16 w-16 border-2 border-white shadow-lg">
                         <AvatarImage src={selectedChild.avatar_url} />
                         <AvatarFallback>
                           <User className="h-8 w-8" />
