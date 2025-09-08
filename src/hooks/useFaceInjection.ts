@@ -75,33 +75,56 @@ export const useFaceInjection = () => {
         throw new Error('Could not detect face placeholder circle');
       }
 
-      // 5) Apply basic tone/expression adjustments
+      // 5) Clear the placeholder area completely (remove any text)
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // 6) Apply basic tone/expression adjustments to avatar
       const adjustedAvatar = await applyEmotionTint(avatarImg, params.emotion || 'happy');
 
-      // 6) Composite avatar into circle (cover fit)
+      // 7) Composite avatar into circle with proper scaling
       ctx.save();
       ctx.beginPath();
       ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
 
-      const size = circle.r * 2;
-      ctx.drawImage(adjustedAvatar, circle.x - circle.r, circle.y - circle.r, size, size);
+      // Scale avatar to fit circle while maintaining aspect ratio
+      const avatarSize = circle.r * 2;
+      const avatarScale = Math.min(
+        avatarSize / adjustedAvatar.naturalWidth,
+        avatarSize / adjustedAvatar.naturalHeight
+      );
+      const scaledWidth = adjustedAvatar.naturalWidth * avatarScale;
+      const scaledHeight = adjustedAvatar.naturalHeight * avatarScale;
+      
+      // Center the avatar in the circle
+      const avatarX = circle.x - scaledWidth / 2;
+      const avatarY = circle.y - scaledHeight / 2;
+      
+      ctx.drawImage(adjustedAvatar, avatarX, avatarY, scaledWidth, scaledHeight);
 
-      // 7) Edge blending using soft radial gradient mask
-      const gradient = ctx.createRadialGradient(circle.x, circle.y, circle.r * 0.6, circle.x, circle.y, circle.r);
+      // 8) Subtle edge blending for natural look
+      const gradient = ctx.createRadialGradient(circle.x, circle.y, circle.r * 0.7, circle.x, circle.y, circle.r);
       gradient.addColorStop(0, 'rgba(0,0,0,0)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0.12)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0.08)');
       ctx.globalCompositeOperation = 'multiply';
       ctx.fillStyle = gradient;
-      ctx.fillRect(circle.x - circle.r, circle.y - circle.r, size, size);
+      ctx.fillRect(circle.x - circle.r, circle.y - circle.r, avatarSize, avatarSize);
       ctx.restore();
 
-      // 8) Slight overall color match (warm tone)
+      // 9) Slight color harmony adjustment
+      ctx.save();
       ctx.globalCompositeOperation = 'soft-light';
-      ctx.fillStyle = 'rgba(232, 213, 183, 0.12)';
-      ctx.fillRect(circle.x - circle.r, circle.y - circle.r, size, size);
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(240, 220, 180, 0.08)';
+      ctx.beginPath();
+      ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
 
       // 9) Export
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
@@ -137,18 +160,20 @@ function detectBlankFaceCircle(ctx: CanvasRenderingContext2D, width: number, hei
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
 
-  // Look specifically for pure white (#ffffff) or near-white circular areas
-  const scanX0 = Math.floor(width * 0.15);
-  const scanX1 = Math.floor(width * 0.85);
-  const scanY0 = Math.floor(height * 0.05);
-  const scanY1 = Math.floor(height * 0.70);
+  console.log(`Starting white circle detection on ${width}x${height} image`);
 
-  let minX = width, maxX = 0, minY = height, maxY = 0;
-  let samples = 0;
-  const step = Math.max(1, Math.floor(Math.min(width, height) / 512));
+  // Expanded scan area for better coverage
+  const scanX0 = Math.floor(width * 0.1);
+  const scanX1 = Math.floor(width * 0.9);
+  const scanY0 = Math.floor(height * 0.1);
+  const scanY1 = Math.floor(height * 0.9);
 
-  console.log(`Scanning for white circle in bounds: ${scanX0}-${scanX1} x ${scanY0}-${scanY1}`);
+  let whitePixels: Array<{ x: number; y: number }> = [];
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 800));
 
+  console.log(`Scanning area: ${scanX0}-${scanX1} x ${scanY0}-${scanY1}, step: ${step}`);
+
+  // First pass: find all pure white pixels
   for (let y = scanY0; y < scanY1; y += step) {
     for (let x = scanX0; x < scanX1; x += step) {
       const i = (y * width + x) * 4;
@@ -157,42 +182,83 @@ function detectBlankFaceCircle(ctx: CanvasRenderingContext2D, width: number, hei
       const b = data[i + 2];
       const a = data[i + 3];
 
-      // Look for pure white or very close to white (allowing for slight compression artifacts)
-      const isPureWhite = r >= 250 && g >= 250 && b >= 250 && a > 200;
-      const isNearWhite = r >= 240 && g >= 240 && b >= 240 && 
-                         Math.abs(r - g) <= 15 && Math.abs(g - b) <= 15 && Math.abs(r - b) <= 15;
+      // Strict white detection for placeholder circles
+      const isPureWhite = r >= 253 && g >= 253 && b >= 253 && a > 240;
       
-      if (isPureWhite || isNearWhite) {
-        if (x < minX) minX = x; if (x > maxX) maxX = x;
-        if (y < minY) minY = y; if (y > maxY) maxY = y;
-        samples++;
+      if (isPureWhite) {
+        whitePixels.push({ x, y });
       }
     }
   }
 
-  console.log(`Found ${samples} white pixels in potential circle area`);
+  console.log(`Found ${whitePixels.length} pure white pixels`);
 
-  if (samples < 100) return null; // not enough white pixels detected
+  if (whitePixels.length < 50) {
+    console.log('Not enough pure white pixels found');
+    return null;
+  }
+
+  // Calculate bounding box of white pixels
+  const minX = Math.min(...whitePixels.map(p => p.x));
+  const maxX = Math.max(...whitePixels.map(p => p.x));
+  const minY = Math.min(...whitePixels.map(p => p.y));
+  const maxY = Math.max(...whitePixels.map(p => p.y));
 
   const cx = Math.round((minX + maxX) / 2);
   const cy = Math.round((minY + maxY) / 2);
   const rx = (maxX - minX) / 2;
   const ry = (maxY - minY) / 2;
-  const r = Math.round((rx + ry) / 2);
+  const r = Math.round(Math.max(rx, ry)); // Use the larger radius for safety
 
-  // Additional circular validation - check if the detected area is roughly circular
+  // Validate circularity
   const aspectRatio = rx > 0 ? ry / rx : 1;
-  if (aspectRatio < 0.6 || aspectRatio > 1.7) {
+  if (aspectRatio < 0.4 || aspectRatio > 2.5) {
     console.log(`Area not circular enough, aspect ratio: ${aspectRatio}`);
     return null;
   }
 
-  if (r < 20) {
+  if (r < 15) {
     console.log(`Circle too small: radius ${r}`);
     return null;
   }
 
-  console.log(`Detected white circle at (${cx}, ${cy}) with radius ${r}`);
+  // Validate that we have a substantial circular white area
+  let circularWhiteCount = 0;
+  const checkRadius = r * 0.8; // Check inner 80% of detected circle
+  
+  for (let dy = -checkRadius; dy <= checkRadius; dy += step) {
+    for (let dx = -checkRadius; dx <= checkRadius; dx += step) {
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance <= checkRadius) {
+        const checkX = cx + dx;
+        const checkY = cy + dy;
+        
+        if (checkX >= 0 && checkX < width && checkY >= 0 && checkY < height) {
+          const i = (Math.round(checkY) * width + Math.round(checkX)) * 4;
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const a = data[i + 3];
+          
+          if (r >= 250 && g >= 250 && b >= 250 && a > 240) {
+            circularWhiteCount++;
+          }
+        }
+      }
+    }
+  }
+
+  const expectedCircularPixels = Math.PI * checkRadius * checkRadius / (step * step);
+  const whiteRatio = circularWhiteCount / expectedCircularPixels;
+
+  console.log(`Circular validation: ${circularWhiteCount}/${expectedCircularPixels.toFixed(0)} pixels (${(whiteRatio * 100).toFixed(1)}% white)`);
+
+  if (whiteRatio < 0.6) {
+    console.log('Not enough white pixels in circular pattern');
+    return null;
+  }
+
+  console.log(`✅ Detected valid white circle at (${cx}, ${cy}) with radius ${r}`);
   return { x: cx, y: cy, r };
 }
 
