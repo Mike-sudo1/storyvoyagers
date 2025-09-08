@@ -61,13 +61,13 @@ const App = () => {
           {/* Protected Routes */}
           <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
           <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-          <Route path="/story/:storyId" element={<ProtectedRoute><StoryReader /></ProtectedRoute>} />
           <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
           <Route path="/my-library" element={<ProtectedRoute><MyLibrary /></ProtectedRoute>} />
           <Route path="/create-story" element={<ProtectedRoute><CreateStory /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           
           {/* Public Routes */}
+          <Route path="/story/:storyId" element={<StoryReader />} />
           <Route path="/about" element={<PublicRoute><About /></PublicRoute>} />
           <Route path="/signin" element={<PublicRoute><SignIn /></PublicRoute>} />
           <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
