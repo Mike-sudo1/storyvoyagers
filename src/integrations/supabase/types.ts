@@ -106,6 +106,39 @@ export type Database = {
           },
         ]
       }
+      personalized_images: {
+        Row: {
+          cache_key: string
+          child_id: string
+          created_at: string
+          emotion: string | null
+          id: string
+          image_url: string
+          page_index: number
+          story_id: string
+        }
+        Insert: {
+          cache_key: string
+          child_id: string
+          created_at?: string
+          emotion?: string | null
+          id?: string
+          image_url: string
+          page_index: number
+          story_id: string
+        }
+        Update: {
+          cache_key?: string
+          child_id?: string
+          created_at?: string
+          emotion?: string | null
+          id?: string
+          image_url?: string
+          page_index?: number
+          story_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           auto_download: string | null

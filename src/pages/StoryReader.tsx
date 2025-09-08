@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -10,6 +10,7 @@ import { useStory } from "@/hooks/useStories";
 import { useChildren } from "@/hooks/useChildren";
 import { usePersonalization } from "@/hooks/usePersonalization";
 import { useIllustrationGeneration } from "@/hooks/useIllustrationGeneration";
+import { usePersonalizedImage } from "@/hooks/usePersonalizedImage";
 import { ChildSelector } from "@/components/ChildSelector";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import threePigsPage1 from "@/assets/three-pigs-page1.jpg";
@@ -36,11 +37,15 @@ const StoryReader = () => {
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [showChildSelector, setShowChildSelector] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
+  const [personalizedImages, setPersonalizedImages] = useState<{ [key: string]: string }>({});
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+  const [loadingImage, setLoadingImage] = useState(false);
 
   const { data: story, isLoading: storyLoading } = useStory(storyId!);
   const { data: children, isLoading: childrenLoading } = useChildren();
   const { personalizeStory } = usePersonalization();
   const { generateIllustration, extractChildFeatures, isGenerating } = useIllustrationGeneration();
+  const { personalizeImage, getEmotionForScene, isProcessing } = usePersonalizedImage();
 
   if (storyLoading || childrenLoading) {
     return (
@@ -105,6 +110,15 @@ const StoryReader = () => {
   const personalizedStory = getPersonalizedContent();
   const storyPages = personalizedStory.content.split('\n\n').filter(page => page.trim());
 
+  // Load personalized image when page or child changes
+  useEffect(() => {
+    if (selectedChild?.avatar_url && story.cover_image_url) {
+      loadPersonalizedImage(currentPage);
+    } else {
+      setCurrentImageUrl(null);
+    }
+  }, [currentPage, selectedChild?.id, story.id]);
+
   const handlePreviousPage = () => {
     setCurrentPage(Math.max(0, currentPage - 1));
   };
@@ -115,6 +129,7 @@ const StoryReader = () => {
 
   // Map page numbers to story images
   const getStoryImage = (pageIndex: number) => {
+    // Fallback to existing image mapping logic
     if (story.title === "Adventure in Ancient Egypt") {
       const egyptImageMap: { [key: number]: string } = {
         0: egyptPage1,
@@ -133,6 +148,46 @@ const StoryReader = () => {
       4: threePigsPage5,
     };
     return imageMap[pageIndex];
+  };
+
+  // Handle personalized image generation for pre-rendered stories with blank faces
+  const loadPersonalizedImage = async (pageIndex: number) => {
+    if (!story.cover_image_url || !selectedChild?.avatar_url) return;
+    
+    const cacheKey = `${story.id}_${pageIndex}`;
+    
+    // Return cached personalized image if available
+    if (personalizedImages[cacheKey]) {
+      setCurrentImageUrl(personalizedImages[cacheKey]);
+      return;
+    }
+    
+    // For "The Pyramid Puzzle" or other stories with blank faces, use face replacement
+    if (story.title.includes("Pyramid Puzzle") || story.description?.includes("blank face")) {
+      setLoadingImage(true);
+      
+      const storyImageUrl = story.cover_image_url;
+      const emotion = getEmotionForScene(storyPages[pageIndex], pageIndex);
+      
+      const personalizedImageUrl = await personalizeImage({
+        storyImageUrl,
+        childAvatarUrl: selectedChild.avatar_url,
+        childId: selectedChild.id,
+        storyId: story.id,
+        pageIndex,
+        emotion
+      });
+      
+      if (personalizedImageUrl) {
+        setPersonalizedImages(prev => ({
+          ...prev,
+          [cacheKey]: personalizedImageUrl
+        }));
+        setCurrentImageUrl(personalizedImageUrl);
+      }
+      
+      setLoadingImage(false);
+    }
   };
 
   const currentIllustration = personalizedStory.illustrations?.find(
@@ -218,16 +273,27 @@ const StoryReader = () => {
               </div>
 
               {/* Story illustration */}
-              {getStoryImage(currentPage) && (
+              {(currentImageUrl || getStoryImage(currentPage)) && (
                 <div className="relative mb-8 mx-auto max-w-2xl">
-                  <img 
-                    src={getStoryImage(currentPage)} 
-                    alt={currentIllustration?.description || `Story illustration for page ${currentPage + 1}`}
-                    className="w-full h-auto rounded-lg shadow-lg"
-                  />
+                  {loadingImage && (
+                    <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                        <p className="text-sm text-muted-foreground">Personalizing illustration...</p>
+                      </div>
+                    </div>
+                  )}
                   
-                  {/* Legacy avatar overlay for Three Little Pigs only */}
-                  {!hasIntegratedIllustrations && selectedChild?.avatar_url && currentIllustration?.placeholder_avatar && (
+                  {!loadingImage && (
+                    <img 
+                      src={currentImageUrl || getStoryImage(currentPage)} 
+                      alt={currentIllustration?.description || `Story illustration for page ${currentPage + 1}`}
+                      className="w-full h-auto rounded-lg shadow-lg"
+                    />
+                  )}
+                  
+                  {/* Legacy avatar overlay for Three Little Pigs only - not used for personalized images */}
+                  {!hasIntegratedIllustrations && !currentImageUrl && selectedChild?.avatar_url && currentIllustration?.placeholder_avatar && (
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                       <Avatar className="h-16 w-16 border-2 border-white shadow-lg">
                         <AvatarImage src={selectedChild.avatar_url} />

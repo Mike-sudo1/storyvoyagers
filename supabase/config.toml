@@ -39,3 +39,9 @@ verify_jwt = true
 
 [functions.update-settings]
 verify_jwt = true
+
+[functions.generate-story-illustration]
+verify_jwt = true
+
+[functions.personalize-story-image]
+verify_jwt = true
