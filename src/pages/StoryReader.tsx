@@ -47,6 +47,61 @@ const StoryReader = () => {
   const { generateIllustration, extractChildFeatures, isGenerating } = useIllustrationGeneration();
   const { personalizeImage, getEmotionForScene, isProcessing } = usePersonalizedImage();
 
+  // Personalized image loader must be defined before any early returns to keep hook order stable
+  const loadPersonalizedImage = async (pageIndex: number) => {
+    if (!story?.cover_image_url || !selectedChild?.avatar_url) return;
+
+    const cacheKey = `${story.id}_${pageIndex}`;
+
+    if (personalizedImages[cacheKey]) {
+      setCurrentImageUrl(personalizedImages[cacheKey]);
+      return;
+    }
+
+    // Derive page text safely without relying on later-computed variables
+    const rawContent = (story.is_template && (story as any).template_content?.content)
+      ? (story as any).template_content.content as string
+      : (story.content || "");
+    const pages = rawContent.split('\n\n').filter(p => p.trim());
+    const pageText = pages[pageIndex] || '';
+    const emotion = getEmotionForScene(pageText, pageIndex);
+
+    if (story.title?.includes("Pyramid Puzzle") || story.description?.includes("blank face")) {
+      setLoadingImage(true);
+      try {
+        const personalizedImageUrl = await personalizeImage({
+          storyImageUrl: story.cover_image_url,
+          childAvatarUrl: selectedChild.avatar_url,
+          childId: selectedChild.id,
+          storyId: story.id,
+          pageIndex,
+          emotion,
+        });
+        if (personalizedImageUrl) {
+          setPersonalizedImages(prev => ({ ...prev, [cacheKey]: personalizedImageUrl }));
+          setCurrentImageUrl(personalizedImageUrl);
+        }
+      } catch (e) {
+        console.error('Error loading personalized image (early):', e);
+      } finally {
+        setLoadingImage(false);
+      }
+    }
+  };
+
+  // Call the loader in an effect - defined before any early returns
+  useEffect(() => {
+    const run = async () => {
+      if (story && selectedChild) {
+        await loadPersonalizedImage(currentPage);
+      } else {
+        setCurrentImageUrl(null);
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, selectedChild?.id, story?.id]);
+
   if (storyLoading || childrenLoading) {
     return (
       <div className="min-h-screen">
@@ -163,49 +218,8 @@ const StoryReader = () => {
     return imageMap[pageIndex];
   };
 
-  // Handle personalized image generation for pre-rendered stories with blank faces
-  const loadPersonalizedImage = async (pageIndex: number) => {
-    if (!story?.cover_image_url || !selectedChild?.avatar_url) return;
-    
-    const cacheKey = `${story.id}_${pageIndex}`;
-    
-    // Return cached personalized image if available
-    if (personalizedImages[cacheKey]) {
-      setCurrentImageUrl(personalizedImages[cacheKey]);
-      return;
-    }
-    
-    // For "The Pyramid Puzzle" or other stories with blank faces, use face replacement
-    if (story.title?.includes("Pyramid Puzzle") || story.description?.includes("blank face")) {
-      setLoadingImage(true);
-      
-      try {
-        const storyImageUrl = story.cover_image_url;
-        const emotion = getEmotionForScene(storyPages[pageIndex] || '', pageIndex);
-        
-        const personalizedImageUrl = await personalizeImage({
-          storyImageUrl,
-          childAvatarUrl: selectedChild.avatar_url,
-          childId: selectedChild.id,
-          storyId: story.id,
-          pageIndex,
-          emotion
-        });
-        
-        if (personalizedImageUrl) {
-          setPersonalizedImages(prev => ({
-            ...prev,
-            [cacheKey]: personalizedImageUrl
-          }));
-          setCurrentImageUrl(personalizedImageUrl);
-        }
-      } catch (error) {
-        console.error('Error loading personalized image:', error);
-      } finally {
-        setLoadingImage(false);
-      }
-    }
-  };
+  // Personalized image loader moved earlier to keep hook order consistent
+
 
   const currentIllustration = personalizedStory.illustrations?.find(
     ill => ill.page === currentPage + 1
