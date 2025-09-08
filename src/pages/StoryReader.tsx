@@ -112,12 +112,25 @@ const StoryReader = () => {
 
   // Load personalized image when page or child changes
   useEffect(() => {
-    if (selectedChild?.avatar_url && story.cover_image_url) {
-      loadPersonalizedImage(currentPage);
-    } else {
-      setCurrentImageUrl(null);
+    console.log('StoryReader useEffect triggered:', { 
+      hasStory: !!story, 
+      hasSelectedChild: !!selectedChild,
+      currentPage,
+      storyId: story?.id 
+    });
+
+    const loadImage = async () => {
+      if (selectedChild?.avatar_url && story?.cover_image_url) {
+        await loadPersonalizedImage(currentPage);
+      } else {
+        setCurrentImageUrl(null);
+      }
+    };
+
+    if (story && selectedChild) {
+      loadImage();
     }
-  }, [currentPage, selectedChild?.id, story.id]);
+  }, [currentPage, selectedChild?.id, story?.id]);
 
   const handlePreviousPage = () => {
     setCurrentPage(Math.max(0, currentPage - 1));
@@ -152,7 +165,7 @@ const StoryReader = () => {
 
   // Handle personalized image generation for pre-rendered stories with blank faces
   const loadPersonalizedImage = async (pageIndex: number) => {
-    if (!story.cover_image_url || !selectedChild?.avatar_url) return;
+    if (!story?.cover_image_url || !selectedChild?.avatar_url) return;
     
     const cacheKey = `${story.id}_${pageIndex}`;
     
@@ -163,30 +176,34 @@ const StoryReader = () => {
     }
     
     // For "The Pyramid Puzzle" or other stories with blank faces, use face replacement
-    if (story.title.includes("Pyramid Puzzle") || story.description?.includes("blank face")) {
+    if (story.title?.includes("Pyramid Puzzle") || story.description?.includes("blank face")) {
       setLoadingImage(true);
       
-      const storyImageUrl = story.cover_image_url;
-      const emotion = getEmotionForScene(storyPages[pageIndex], pageIndex);
-      
-      const personalizedImageUrl = await personalizeImage({
-        storyImageUrl,
-        childAvatarUrl: selectedChild.avatar_url,
-        childId: selectedChild.id,
-        storyId: story.id,
-        pageIndex,
-        emotion
-      });
-      
-      if (personalizedImageUrl) {
-        setPersonalizedImages(prev => ({
-          ...prev,
-          [cacheKey]: personalizedImageUrl
-        }));
-        setCurrentImageUrl(personalizedImageUrl);
+      try {
+        const storyImageUrl = story.cover_image_url;
+        const emotion = getEmotionForScene(storyPages[pageIndex] || '', pageIndex);
+        
+        const personalizedImageUrl = await personalizeImage({
+          storyImageUrl,
+          childAvatarUrl: selectedChild.avatar_url,
+          childId: selectedChild.id,
+          storyId: story.id,
+          pageIndex,
+          emotion
+        });
+        
+        if (personalizedImageUrl) {
+          setPersonalizedImages(prev => ({
+            ...prev,
+            [cacheKey]: personalizedImageUrl
+          }));
+          setCurrentImageUrl(personalizedImageUrl);
+        }
+      } catch (error) {
+        console.error('Error loading personalized image:', error);
+      } finally {
+        setLoadingImage(false);
       }
-      
-      setLoadingImage(false);
     }
   };
 
