@@ -5,7 +5,7 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, BookOpen, User } from "lucide-react";
+import { ArrowLeft, User } from "lucide-react";
 import { useStory } from "@/hooks/useStories";
 import { useChildren } from "@/hooks/useChildren";
 import { usePersonalization } from "@/hooks/usePersonalization";
@@ -32,8 +32,11 @@ interface Child {
 }
 
 const StoryReader = () => {
+  // ALL HOOKS MUST BE CALLED FIRST - BEFORE ANY EARLY RETURNS
   const { storyId } = useParams();
   const navigate = useNavigate();
+  
+  // State hooks
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [showChildSelector, setShowChildSelector] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
@@ -41,13 +44,49 @@ const StoryReader = () => {
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
 
+  // Custom hooks
   const { data: story, isLoading: storyLoading } = useStory(storyId!);
   const { data: children, isLoading: childrenLoading } = useChildren();
   const { personalizeStory } = usePersonalization();
-  const { generateIllustration, extractChildFeatures, isGenerating } = useIllustrationGeneration();
-  const { personalizeImage, getEmotionForScene, isProcessing } = usePersonalizedImage();
+  const { generateIllustration, extractChildFeatures } = useIllustrationGeneration();
+  const { personalizeImage, getEmotionForScene } = usePersonalizedImage();
 
-  // Personalized image loader must be defined before any early returns to keep hook order stable
+  // Get personalized content - this needs to be computed before useEffect
+  const getPersonalizedContent = () => {
+    if (!story?.is_template || !story?.template_content || !selectedChild) {
+      return {
+        content: story?.content || '',
+        illustrations: []
+      };
+    }
+    return personalizeStory(story.template_content, selectedChild);
+  };
+
+  const personalizedStory = getPersonalizedContent();
+  const storyPages = personalizedStory.content.split('\n\n').filter(page => page.trim());
+
+  // Map page numbers to story images
+  const getStoryImage = (pageIndex: number) => {
+    if (story?.title === "Adventure in Ancient Egypt") {
+      const egyptImageMap: { [key: number]: string } = {
+        0: egyptPage1,
+        1: egyptPage2,
+        2: egyptPage3,
+      };
+      return egyptImageMap[pageIndex];
+    }
+    
+    const imageMap: { [key: number]: string } = {
+      0: threePigsPage1,
+      1: threePigsPage2,
+      2: threePigsPage3,
+      3: threePigsPage4,
+      4: threePigsPage5,
+    };
+    return imageMap[pageIndex];
+  };
+
+  // Handle personalized image generation
   const loadPersonalizedImage = async (pageIndex: number) => {
     if (!story?.cover_image_url || !selectedChild?.avatar_url) return;
 
@@ -58,38 +97,38 @@ const StoryReader = () => {
       return;
     }
 
-    // Derive page text safely without relying on later-computed variables
-    const rawContent = (story.is_template && (story as any).template_content?.content)
-      ? (story as any).template_content.content as string
-      : (story.content || "");
-    const pages = rawContent.split('\n\n').filter(p => p.trim());
-    const pageText = pages[pageIndex] || '';
-    const emotion = getEmotionForScene(pageText, pageIndex);
-
     if (story.title?.includes("Pyramid Puzzle") || story.description?.includes("blank face")) {
       setLoadingImage(true);
+      
       try {
+        const pageText = storyPages[pageIndex] || '';
+        const emotion = getEmotionForScene(pageText, pageIndex);
+        
         const personalizedImageUrl = await personalizeImage({
           storyImageUrl: story.cover_image_url,
           childAvatarUrl: selectedChild.avatar_url,
           childId: selectedChild.id,
           storyId: story.id,
           pageIndex,
-          emotion,
+          emotion
         });
+        
         if (personalizedImageUrl) {
-          setPersonalizedImages(prev => ({ ...prev, [cacheKey]: personalizedImageUrl }));
+          setPersonalizedImages(prev => ({
+            ...prev,
+            [cacheKey]: personalizedImageUrl
+          }));
           setCurrentImageUrl(personalizedImageUrl);
         }
-      } catch (e) {
-        console.error('Error loading personalized image (early):', e);
+      } catch (error) {
+        console.error('Error loading personalized image:', error);
       } finally {
         setLoadingImage(false);
       }
     }
   };
 
-  // Call the loader in an effect - defined before any early returns
+  // useEffect for loading personalized images
   useEffect(() => {
     const run = async () => {
       if (story && selectedChild) {
@@ -99,9 +138,24 @@ const StoryReader = () => {
       }
     };
     run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, selectedChild?.id, story?.id]);
 
+  // Helper functions
+  const handlePreviousPage = () => {
+    setCurrentPage(Math.max(0, currentPage - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(Math.min(storyPages.length - 1, currentPage + 1));
+  };
+
+  const currentIllustration = personalizedStory.illustrations?.find(
+    ill => ill.page === currentPage + 1
+  );
+
+  const hasIntegratedIllustrations = story?.id !== 'three-little-pigs' && personalizedStory.illustrations?.length > 0;
+
+  // NOW WE CAN DO CONDITIONAL RENDERING - ALL HOOKS HAVE BEEN CALLED
   if (storyLoading || childrenLoading) {
     return (
       <div className="min-h-screen">
@@ -133,7 +187,6 @@ const StoryReader = () => {
     );
   }
 
-  // Show child selector if no child is selected and children exist
   if (showChildSelector && children && children.length > 0) {
     return (
       <div className="min-h-screen">
@@ -149,97 +202,6 @@ const StoryReader = () => {
       </div>
     );
   }
-
-  // Get personalized content
-  const getPersonalizedContent = () => {
-    if (!story.is_template || !story.template_content || !selectedChild) {
-      return {
-        content: story.content,
-        illustrations: []
-      };
-    }
-
-    return personalizeStory(story.template_content, selectedChild);
-  };
-
-  const personalizedStory = getPersonalizedContent();
-  const storyPages = personalizedStory.content.split('\n\n').filter(page => page.trim());
-
-  // Load personalized image when page or child changes
-  useEffect(() => {
-    console.log('StoryReader useEffect triggered:', { 
-      hasStory: !!story, 
-      hasSelectedChild: !!selectedChild,
-      currentPage,
-      storyId: story?.id 
-    });
-
-    const loadImage = async () => {
-      if (selectedChild?.avatar_url && story?.cover_image_url) {
-        await loadPersonalizedImage(currentPage);
-      } else {
-        setCurrentImageUrl(null);
-      }
-    };
-
-    if (story && selectedChild) {
-      loadImage();
-    }
-  }, [currentPage, selectedChild?.id, story?.id]);
-
-  const handlePreviousPage = () => {
-    setCurrentPage(Math.max(0, currentPage - 1));
-  };
-
-  const handleNextPage = () => {
-    setCurrentPage(Math.min(storyPages.length - 1, currentPage + 1));
-  };
-
-  // Map page numbers to story images
-  const getStoryImage = (pageIndex: number) => {
-    // Fallback to existing image mapping logic
-    if (story.title === "Adventure in Ancient Egypt") {
-      const egyptImageMap: { [key: number]: string } = {
-        0: egyptPage1,
-        1: egyptPage2,
-        2: egyptPage3,
-      };
-      return egyptImageMap[pageIndex];
-    }
-    
-    // Default to Three Little Pigs images
-    const imageMap: { [key: number]: string } = {
-      0: threePigsPage1,
-      1: threePigsPage2,
-      2: threePigsPage3,
-      3: threePigsPage4,
-      4: threePigsPage5,
-    };
-    return imageMap[pageIndex];
-  };
-
-  // Personalized image loader moved earlier to keep hook order consistent
-
-
-  const currentIllustration = personalizedStory.illustrations?.find(
-    ill => ill.page === currentPage + 1
-  );
-
-  // Check if story has integrated character illustrations (no overlay needed)
-  const hasIntegratedIllustrations = story.id !== 'three-little-pigs' && personalizedStory.illustrations?.length > 0;
-
-  // Generate personalized illustration for current page
-  const handleGenerateIllustration = async () => {
-    if (!currentIllustration || !selectedChild) return null;
-    
-    const childFeatures = extractChildFeatures(selectedChild);
-    return await generateIllustration({
-      prompt: currentIllustration.description,
-      childFeatures,
-      avatarUrl: selectedChild.avatar_url,
-      style: 'cartoon'
-    });
-  };
 
   return (
     <div className="min-h-screen">
@@ -290,13 +252,11 @@ const StoryReader = () => {
                   {story.title}
                 </h1>
                 
-                {/* Page indicator */}
                 <div className="text-sm text-muted-foreground mb-6">
                   Page {currentPage + 1} of {storyPages.length}
                 </div>
               </div>
 
-              {/* Current story page */}
               <div className="prose prose-lg max-w-none text-center mb-8">
                 <p className="text-lg leading-relaxed font-medium">
                   {storyPages[currentPage]}
@@ -323,7 +283,7 @@ const StoryReader = () => {
                     />
                   )}
                   
-                  {/* Legacy avatar overlay for Three Little Pigs only - not used for personalized images */}
+                  {/* Legacy avatar overlay for Three Little Pigs only */}
                   {!hasIntegratedIllustrations && !currentImageUrl && selectedChild?.avatar_url && currentIllustration?.placeholder_avatar && (
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                       <Avatar className="h-16 w-16 border-2 border-white shadow-lg">
