@@ -37,11 +37,11 @@ export const useFaceInjection = () => {
   const uploadAndRecord = async (cacheKey: string, storyId: string, childId: string, pageIndex: number, blob: Blob) => {
     const path = `personalized/${storyId}/${childId}/page-${pageIndex}.png`;
     const { error: uploadErr } = await supabase.storage
-      .from('StoryVoyagers')
+      .from('Meroe')
       .upload(path, blob, { contentType: 'image/png', upsert: true });
     if (uploadErr) throw uploadErr;
 
-    const publicUrl = `${supabase.storage.from('StoryVoyagers').getPublicUrl(path).data.publicUrl}`;
+    const publicUrl = `${supabase.storage.from('Meroe').getPublicUrl(path).data.publicUrl}`;
 
     await supabase
       .from('personalized_images')

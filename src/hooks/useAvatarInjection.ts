@@ -55,7 +55,7 @@ export const useAvatarInjection = () => {
 
   const getInjectedImageUrl = (storyId: string, pageIndex: number): string => {
     return supabase.storage
-      .from('StoryVoyagers')
+      .from('Meroe')
       .getPublicUrl(`story_injected/${storyId}/page_${pageIndex}.png`).data.publicUrl;
   };
 

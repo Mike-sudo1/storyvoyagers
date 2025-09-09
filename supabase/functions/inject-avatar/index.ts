@@ -39,13 +39,13 @@ serve(async (req) => {
     // Check if injected image already exists
     const injectedPath = `story_injected/${story_id}/page_${page_index}.png`;
     const { data: existingFile } = await supabase.storage
-      .from('StoryVoyagers')
+      .from('Meroe')
       .list(`story_injected/${story_id}/`, { search: `page_${page_index}.png` });
 
     if (existingFile && existingFile.length > 0) {
       console.log('Using existing injected image');
       const publicUrl = supabase.storage
-        .from('StoryVoyagers')
+        .from('Meroe')
         .getPublicUrl(injectedPath).data.publicUrl;
       
       return new Response(JSON.stringify({ 
@@ -68,7 +68,7 @@ serve(async (req) => {
     let maskBlob: Blob;
     try {
       const { data: maskFile, error: maskErr } = await supabase.storage
-        .from('StoryVoyagers')
+        .from('Meroe')
         .download('masks/circle_512.png');
       if (maskErr || !maskFile) {
         throw maskErr || new Error('Mask file not found');
@@ -78,7 +78,7 @@ serve(async (req) => {
       console.error('Failed to download mask from storage:', e);
       // Fallback: try public URL
       const maskUrl = supabase.storage
-        .from('StoryVoyagers')
+        .from('Meroe')
         .getPublicUrl('masks/circle_512.png').data.publicUrl;
       const maskResp = await fetch(maskUrl);
       if (!maskResp.ok) {
@@ -150,7 +150,7 @@ serve(async (req) => {
 
     // Upload to Supabase storage
     const { error: uploadError } = await supabase.storage
-      .from('StoryVoyagers')
+      .from('Meroe')
       .upload(injectedPath, generatedBlob, { 
         contentType: 'image/png', 
         upsert: true 
@@ -162,7 +162,7 @@ serve(async (req) => {
 
     // Get the public URL
     const publicUrl = supabase.storage
-      .from('StoryVoyagers')
+      .from('Meroe')
       .getPublicUrl(injectedPath).data.publicUrl;
 
     console.log('Successfully generated and saved injected image:', publicUrl);

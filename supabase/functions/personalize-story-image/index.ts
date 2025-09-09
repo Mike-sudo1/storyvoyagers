@@ -81,7 +81,7 @@ serve(async (req) => {
     // Upload the personalized image to Supabase Storage
     const fileName = `personalized/${cacheKey}_${Date.now()}.png`;
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('StoryVoyagers')
+      .from('Meroe')
       .upload(fileName, personalizedImage, {
         contentType: 'image/png',
         cacheControl: '3600'
@@ -91,7 +91,7 @@ serve(async (req) => {
       throw new Error(`Failed to upload personalized image: ${uploadError.message}`);
     }
 
-    const personalizedImageUrl = `${supabaseUrl}/storage/v1/object/public/StoryVoyagers/${fileName}`;
+    const personalizedImageUrl = `${supabaseUrl}/storage/v1/object/public/Meroe/${fileName}`;
 
     // Cache the result
     await supabase

@@ -47,11 +47,11 @@ const Header = () => {
           <Link to={user ? "/" : "/about"} className="flex items-center space-x-3">
             <img 
               src="/lovable-uploads/3bf06096-e00d-42ad-b576-8d028ecb75d9.png" 
-              alt="StoryVoyagers Logo" 
+              alt="Meroe Logo"
               className="h-10 w-10 rounded-xl"
             />
             <div>
-              <h1 className="font-fredoka font-bold text-xl">StoryVoyagers</h1>
+              <h1 className="font-fredoka font-bold text-xl">Meroe</h1>
               <p className="text-xs text-muted-foreground">Educational Adventures</p>
             </div>
           </Link>

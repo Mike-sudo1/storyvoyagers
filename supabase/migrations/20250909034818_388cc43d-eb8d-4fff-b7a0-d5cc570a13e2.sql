@@ -1,12 +1,12 @@
 -- Fix storage policies for face injection
--- Create storage policies for the StoryVoyagers bucket to allow personalized image uploads
+-- Create storage policies for the Meroe bucket to allow personalized image uploads
 
 -- Allow authenticated users to upload personalized images to their own folders
 CREATE POLICY "Users can upload personalized images" 
 ON storage.objects 
 FOR INSERT 
 WITH CHECK (
-  bucket_id = 'StoryVoyagers' 
+  bucket_id = 'Meroe' 
   AND auth.uid() IS NOT NULL
   AND (storage.foldername(name))[1] = 'personalized'
 );
@@ -16,7 +16,7 @@ CREATE POLICY "Users can view personalized images"
 ON storage.objects 
 FOR SELECT 
 USING (
-  bucket_id = 'StoryVoyagers'
+  bucket_id = 'Meroe'
   AND (
     -- Allow public access to public story images
     (storage.foldername(name))[1] != 'personalized'
@@ -31,7 +31,7 @@ CREATE POLICY "Users can update personalized images"
 ON storage.objects 
 FOR UPDATE 
 USING (
-  bucket_id = 'StoryVoyagers' 
+  bucket_id = 'Meroe' 
   AND auth.uid() IS NOT NULL
   AND (storage.foldername(name))[1] = 'personalized'
 );

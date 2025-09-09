@@ -23,7 +23,7 @@ const SupabaseConnectionPrompt = () => {
         <CardContent className="space-y-6">
           <div className="text-center space-y-3">
             <p className="text-muted-foreground">
-              To enable authentication, data storage, and all the amazing features of StoryVoyagers, 
+              To enable authentication, data storage, and all the amazing features of Meroe,
               you need to connect your Supabase project.
             </p>
           </div>
