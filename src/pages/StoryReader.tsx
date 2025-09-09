@@ -13,6 +13,7 @@ import { useIllustrationGeneration } from "@/hooks/useIllustrationGeneration";
 import { usePersonalizedImage } from "@/hooks/usePersonalizedImage";
 import { useFaceInjection } from "@/hooks/useFaceInjection";
 import { useDalleFaceInjection } from "@/hooks/useDalleFaceInjection";
+import { useAvatarInjection, detectEmotionFromText } from "@/hooks/useAvatarInjection";
 import { ChildSelector } from "@/components/ChildSelector";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import threePigsPage1 from "@/assets/three-pigs-page1.jpg";
@@ -54,6 +55,7 @@ const StoryReader = () => {
   const { getEmotionForScene } = usePersonalizedImage();
   const { injectAvatarIntoImage, isInjecting } = useFaceInjection();
   const { injectFaceWithDalle, isProcessing: isDalleProcessing } = useDalleFaceInjection();
+  const { injectAvatar, isProcessing: isAvatarProcessing, getInjectedImageUrl } = useAvatarInjection();
 
   // Get personalized content - this needs to be computed before useEffect
   const getPersonalizedContent = () => {

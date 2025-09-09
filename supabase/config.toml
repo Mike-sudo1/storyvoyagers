@@ -48,3 +48,6 @@ verify_jwt = true
 
 [functions.dalle-face-injection]
 verify_jwt = false
+
+[functions.inject-avatar]
+verify_jwt = false
