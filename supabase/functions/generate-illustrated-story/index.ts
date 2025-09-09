@@ -18,6 +18,11 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Generate illustrated story function started');
+    
+    const requestBody = await req.json();
+    console.log('Request body:', JSON.stringify(requestBody, null, 2));
+
     const {
       story_id,
       child_id,
@@ -25,14 +30,34 @@ serve(async (req) => {
       child_avatar_url,
       character_prompt,
       style_prompt = "colorful watercolor cartoon, clean outlines, semi-stylized background"
-    } = await req.json();
+    } = requestBody;
+
+    if (!story_id || !child_id || !story_pages || !Array.isArray(story_pages)) {
+      console.error('Missing required parameters');
+      return new Response(JSON.stringify({
+        error: 'Missing required parameters'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     console.log('Generating illustrations for story:', { story_id, child_id, pages: story_pages.length });
 
     const openAIKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIKey) {
-      throw new Error('OpenAI API key not configured');
+      console.error('OpenAI API key not configured');
+      return new Response(JSON.stringify({
+        error: 'OpenAI API key not configured'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
+
+    // Limit to first 5 pages to avoid timeouts
+    const pagesToProcess = story_pages.slice(0, 5);
+    console.log(`Processing ${pagesToProcess.length} pages (limited from ${story_pages.length})`);
 
     // Check existing illustrations to avoid regeneration
     const { data: existing } = await supabase
@@ -45,8 +70,8 @@ serve(async (req) => {
     const results: any[] = [];
 
     // Process each page
-    for (let i = 0; i < story_pages.length; i++) {
-      const page = story_pages[i];
+    for (let i = 0; i < pagesToProcess.length; i++) {
+      const page = pagesToProcess[i];
       const page_number = page.page_number || i + 1;
 
       // Skip if already generated successfully
