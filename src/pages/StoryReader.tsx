@@ -12,6 +12,7 @@ import { usePersonalization } from "@/hooks/usePersonalization";
 import { useIllustrationGeneration } from "@/hooks/useIllustrationGeneration";
 import { usePersonalizedImage } from "@/hooks/usePersonalizedImage";
 import { useFaceInjection } from "@/hooks/useFaceInjection";
+import { useDalleFaceInjection } from "@/hooks/useDalleFaceInjection";
 import { ChildSelector } from "@/components/ChildSelector";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import threePigsPage1 from "@/assets/three-pigs-page1.jpg";
@@ -52,6 +53,7 @@ const StoryReader = () => {
   const { generateIllustration, extractChildFeatures } = useIllustrationGeneration();
   const { getEmotionForScene } = usePersonalizedImage();
   const { injectAvatarIntoImage, isInjecting } = useFaceInjection();
+  const { injectFaceWithDalle, isProcessing: isDalleProcessing } = useDalleFaceInjection();
 
   // Get personalized content - this needs to be computed before useEffect
   const getPersonalizedContent = () => {
@@ -125,22 +127,22 @@ const StoryReader = () => {
         
         // Only inject avatar if placeholder_avatar is true
         if (illustration?.placeholder_avatar && selectedChild?.avatar_url) {
-          console.log(`Injecting avatar for page ${pageIndex + 1}:`, {
+          console.log(`Using DALL-E injection for page ${pageIndex + 1}:`, {
             baseImageUrl,
             hasIllustrationImage: !!(illustration?.image_url || illustration?.image),
             emotion,
             placeholderAvatar: illustration.placeholder_avatar
           });
           
-          const personalizedImageUrl = await injectAvatarIntoImage({
-            baseImageUrl,
+          // Use DALL-E inpainting for better blending
+          const personalizedImageUrl = await injectFaceWithDalle({
+            illustrationUrl: baseImageUrl,
             avatarUrl: selectedChild.avatar_url,
             childId: selectedChild.id,
             storyId: story.id,
             pageIndex,
             emotion,
-            faceAnchor: illustration.face_anchor,
-            storyText: pageText // Pass the story text for emotion detection
+            storyText: pageText
           });
           
           if (personalizedImageUrl) {
@@ -310,16 +312,18 @@ const StoryReader = () => {
               {/* Story illustration */}
               {(currentImageUrl || getStoryImage(currentPage) || currentIllustration?.image_url || currentIllustration?.image) && (
                 <div className="relative mb-8 mx-auto max-w-2xl">
-                  {loadingImage && (
+                  {(loadingImage || isDalleProcessing) && (
                     <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                        <p className="text-sm text-muted-foreground">Personalizing illustration...</p>
+                        <p className="text-sm text-muted-foreground">
+                          {isDalleProcessing ? "Creating personalized illustration with AI..." : "Personalizing illustration..."}
+                        </p>
                       </div>
                     </div>
                   )}
                   
-                  {!loadingImage && (
+                  {!(loadingImage || isDalleProcessing) && (
                     <img 
                       src={
                         currentImageUrl || 

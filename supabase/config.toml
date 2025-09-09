@@ -45,3 +45,6 @@ verify_jwt = true
 
 [functions.personalize-story-image]
 verify_jwt = true
+
+[functions.dalle-face-injection]
+verify_jwt = false
