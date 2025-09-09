@@ -49,9 +49,28 @@ serve(async (req) => {
     }
     const avatarBlob = await avatarResponse.blob();
 
-    // Create a circular mask for the placeholder area
-    const maskBlob = await createCircularMask();
-
+    // Load prebuilt mask from Supabase Storage (512x512)
+    let maskBlob: Blob;
+    try {
+      const { data: maskFile, error: maskErr } = await supabase.storage
+        .from('StoryVoyagers')
+        .download('masks/circle_512.png');
+      if (maskErr || !maskFile) {
+        throw maskErr || new Error('Mask file not found');
+      }
+      maskBlob = maskFile as Blob;
+    } catch (e) {
+      console.error('Failed to download mask from storage:', e);
+      // Fallback: try public URL
+      const maskUrl = supabase.storage
+        .from('StoryVoyagers')
+        .getPublicUrl('masks/circle_512.png').data.publicUrl;
+      const maskResp = await fetch(maskUrl);
+      if (!maskResp.ok) {
+        throw new Error('Failed to fetch mask via public URL');
+      }
+      maskBlob = await maskResp.blob();
+    }
     // Prepare the prompt based on emotion and story context
     const emotionPrompts = {
       'happy': 'smiling cheerfully with bright eyes',
@@ -74,7 +93,7 @@ serve(async (req) => {
     formData.append('mask', maskBlob, 'mask.png');
     formData.append('prompt', prompt);
     formData.append('n', '1');
-    formData.append('size', '1024x1024');
+    formData.append('size', '512x512');
 
     // Call OpenAI DALL-E inpainting API
     const dalleResponse = await fetch('https://api.openai.com/v1/images/edits', {
@@ -155,26 +174,4 @@ serve(async (req) => {
   }
 });
 
-// Create a circular mask for the placeholder area
-async function createCircularMask(): Promise<Blob> {
-  // Create a simple circular mask - white circle on black background
-  const canvas = new OffscreenCanvas(1024, 1024);
-  const ctx = canvas.getContext('2d')!;
-  
-  // Fill with black (areas to keep)
-  ctx.fillStyle = 'black';
-  ctx.fillRect(0, 0, 1024, 1024);
-  
-  // Draw white circle in center (area to replace)
-  const centerX = 512;
-  const centerY = 400; // Slightly higher than center for face placement
-  const radius = 120;
-  
-  ctx.fillStyle = 'white';
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-  ctx.fill();
-  
-  const blob = await canvas.convertToBlob({ type: 'image/png' });
-  return blob;
-}
+// Mask is loaded from Supabase Storage at StoryVoyagers/masks/circle_512.png
