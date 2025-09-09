@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface FaceAnchor {
+  type: 'circle';
+  x: number;
+  y: number;
+  r: number;
+  units: 'ratio';
+}
+
 export interface InjectParams {
   baseImageUrl: string;
   avatarUrl: string;
@@ -8,6 +16,7 @@ export interface InjectParams {
   childId: string;
   pageIndex: number;
   emotion?: 'happy' | 'curious' | 'surprised' | 'excited' | 'thoughtful' | 'confident';
+  faceAnchor?: FaceAnchor;
 }
 
 export const useFaceInjection = () => {
@@ -69,10 +78,23 @@ export const useFaceInjection = () => {
       canvas.height = baseImg.naturalHeight;
       ctx.drawImage(baseImg, 0, 0);
 
-      // 4) Detect blank face circle
-      const circle = detectBlankFaceCircle(ctx, canvas.width, canvas.height);
-      if (!circle) {
-        throw new Error('Could not detect face placeholder circle');
+      // 4) Get face position - use anchor if provided, otherwise detect
+      let circle;
+      if (params.faceAnchor) {
+        // Convert ratio coordinates to pixel coordinates
+        circle = {
+          x: params.faceAnchor.x * canvas.width,
+          y: params.faceAnchor.y * canvas.height,
+          r: params.faceAnchor.r * Math.min(canvas.width, canvas.height)
+        };
+        console.log('Using face anchor coordinates:', circle);
+      } else {
+        // Fallback to circle detection
+        circle = detectBlankFaceCircle(ctx, canvas.width, canvas.height);
+        if (!circle) {
+          throw new Error('Could not detect face placeholder circle');
+        }
+        console.log('Detected face circle:', circle);
       }
 
       // 5) Clear the placeholder area completely (remove any text)

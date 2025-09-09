@@ -138,7 +138,8 @@ const StoryReader = () => {
             childId: selectedChild.id,
             storyId: story.id,
             pageIndex,
-            emotion
+            emotion,
+            faceAnchor: illustration.face_anchor
           });
           
           if (personalizedImageUrl) {
