@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { detectEmotionFromText } from '@/hooks/useAvatarInjection';
 
 export interface FaceAnchor {
   type: 'circle';
@@ -406,32 +407,7 @@ function extractFaceOnly(avatar: HTMLImageElement): HTMLCanvasElement {
   return canvas;
 }
 
-function detectEmotionFromText(storyText: string): 'happy' | 'curious' | 'surprised' | 'excited' | 'thoughtful' | 'confident' {
-  const text = storyText.toLowerCase();
-  
-  // Emotion detection patterns
-  if (text.includes('smiled') || text.includes('happy') || text.includes('laughed') || text.includes('joy')) {
-    return 'happy';
-  }
-  if (text.includes('stepped forward') || text.includes('confident') || text.includes('boldly') || text.includes('determined')) {
-    return 'confident';
-  }
-  if (text.includes('curious') || text.includes('wondered') || text.includes('explore') || text.includes('mystery')) {
-    return 'curious';
-  }
-  if (text.includes('surprised') || text.includes('amazed') || text.includes('gasped') || text.includes('wow')) {
-    return 'surprised';
-  }
-  if (text.includes('excited') || text.includes('eager') || text.includes('thrilled') || text.includes('adventure')) {
-    return 'excited';
-  }
-  if (text.includes('thought') || text.includes('pondered') || text.includes('considered') || text.includes('carefully')) {
-    return 'thoughtful';
-  }
-  
-  // Default to curious for educational content
-  return 'curious';
-}
+// Emotion detection function moved to useAvatarInjection.ts to avoid duplication
 
 async function applyStoryEmotion(
   canvas: HTMLCanvasElement, 
