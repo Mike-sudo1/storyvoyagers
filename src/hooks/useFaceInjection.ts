@@ -105,47 +105,72 @@ export const useFaceInjection = () => {
       ctx.fill();
       ctx.restore();
 
-      // 6) Apply basic tone/expression adjustments to avatar
-      const adjustedAvatar = await applyEmotionTint(avatarImg, params.emotion || 'happy');
+      // 6) Extract face region from avatar and apply emotion adjustments
+      const faceRegion = extractFaceRegion(avatarImg);
+      
+      // Wait for face region to load before applying emotion tint
+      await new Promise((resolve) => {
+        if (faceRegion.complete) {
+          resolve(true);
+        } else {
+          faceRegion.onload = () => resolve(true);
+        }
+      });
+      
+      const adjustedFace = await applyEmotionTint(faceRegion, params.emotion || 'happy');
 
-      // 7) Composite avatar into circle with proper scaling
+      // 7) Composite face into circle with natural blending
       ctx.save();
+      
+      // Create circular clipping mask
       ctx.beginPath();
       ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
 
-      // Scale avatar to fit circle while maintaining aspect ratio
-      const avatarSize = circle.r * 2;
-      const avatarScale = Math.min(
-        avatarSize / adjustedAvatar.naturalWidth,
-        avatarSize / adjustedAvatar.naturalHeight
+      // Scale face to fit circle optimally
+      const faceSize = circle.r * 1.8; // Slightly smaller than full circle for natural look
+      const faceScale = Math.min(
+        faceSize / adjustedFace.naturalWidth,
+        faceSize / adjustedFace.naturalHeight
       );
-      const scaledWidth = adjustedAvatar.naturalWidth * avatarScale;
-      const scaledHeight = adjustedAvatar.naturalHeight * avatarScale;
+      const scaledWidth = adjustedFace.naturalWidth * faceScale;
+      const scaledHeight = adjustedFace.naturalHeight * faceScale;
       
-      // Center the avatar in the circle
-      const avatarX = circle.x - scaledWidth / 2;
-      const avatarY = circle.y - scaledHeight / 2;
+      // Center the face in the circle
+      const faceX = circle.x - scaledWidth / 2;
+      const faceY = circle.y - scaledHeight / 2;
       
-      ctx.drawImage(adjustedAvatar, avatarX, avatarY, scaledWidth, scaledHeight);
+      // Draw the face with soft edges
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(adjustedFace, faceX, faceY, scaledWidth, scaledHeight);
 
-      // 8) Subtle edge blending for natural look
-      const gradient = ctx.createRadialGradient(circle.x, circle.y, circle.r * 0.7, circle.x, circle.y, circle.r);
-      gradient.addColorStop(0, 'rgba(0,0,0,0)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0.08)');
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = gradient;
-      ctx.fillRect(circle.x - circle.r, circle.y - circle.r, avatarSize, avatarSize);
+      // 8) Apply natural blending and integration effects
       ctx.restore();
-
-      // 9) Slight color harmony adjustment
       ctx.save();
+      
+      // Soft edge feathering
+      const featherGradient = ctx.createRadialGradient(
+        circle.x, circle.y, circle.r * 0.6, 
+        circle.x, circle.y, circle.r
+      );
+      featherGradient.addColorStop(0, 'rgba(0,0,0,0)');
+      featherGradient.addColorStop(0.8, 'rgba(0,0,0,0)');
+      featherGradient.addColorStop(1, 'rgba(0,0,0,0.15)');
+      
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.beginPath();
+      ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2);
+      ctx.fillStyle = featherGradient;
+      ctx.fill();
+      
+      // Color harmony adjustment for art style integration
       ctx.globalCompositeOperation = 'soft-light';
-      ctx.fillStyle = 'rgba(240, 220, 180, 0.08)';
+      ctx.fillStyle = 'rgba(240, 220, 180, 0.12)';
       ctx.beginPath();
       ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2);
       ctx.fill();
+      
       ctx.restore();
 
       // 9) Export
@@ -323,4 +348,57 @@ async function applyEmotionTint(avatar: HTMLImageElement, emotion: InjectParams[
 
   const adjusted = await loadImage(URL.createObjectURL(blob));
   return adjusted;
+}
+
+function extractFaceRegion(avatar: HTMLImageElement): HTMLImageElement {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return avatar;
+
+  const originalWidth = avatar.naturalWidth;
+  const originalHeight = avatar.naturalHeight;
+
+  // Determine face crop region - assume face is in center portion of avatar
+  // Most avatar images have the face in the upper-center area
+  const faceWidth = Math.min(originalWidth * 0.8, originalHeight * 0.8);
+  const faceHeight = faceWidth; // Square crop for circular insertion
+  
+  // Position face crop slightly towards upper portion (where faces typically are)
+  const cropX = (originalWidth - faceWidth) / 2;
+  const cropY = Math.max(0, (originalHeight - faceHeight) / 2 - originalHeight * 0.1);
+
+  canvas.width = faceWidth;
+  canvas.height = faceHeight;
+
+  // Draw cropped face region
+  ctx.drawImage(
+    avatar,
+    cropX, cropY, faceWidth, faceHeight, // Source crop
+    0, 0, faceWidth, faceHeight          // Destination
+  );
+
+  // Apply circular mask to the face crop for smoother integration
+  const imageData = ctx.getImageData(0, 0, faceWidth, faceHeight);
+  const data = imageData.data;
+  const centerX = faceWidth / 2;
+  const centerY = faceHeight / 2;
+  const radius = Math.min(faceWidth, faceHeight) / 2;
+
+  // Apply soft circular mask
+  for (let y = 0; y < faceHeight; y++) {
+    for (let x = 0; x < faceWidth; x++) {
+      const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+      const alpha = Math.max(0, Math.min(1, (radius - distance + 10) / 20)); // Soft edge
+      
+      const pixelIndex = (y * faceWidth + x) * 4;
+      data[pixelIndex + 3] = data[pixelIndex + 3] * alpha; // Apply alpha
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  // Convert canvas to image
+  const faceImg = new Image();
+  faceImg.src = canvas.toDataURL('image/png');
+  return faceImg;
 }
