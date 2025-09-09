@@ -194,7 +194,7 @@ const StoryReader = () => {
       // Check if illustrations already exist
       const hasExisting = await checkExistingIllustrations(story.id, selectedChild.id);
       
-      if (!hasExisting && story.content) {
+      if (!hasExisting && (story.content || story.template_content?.content)) {
         // Generate story pages for illustration
         const storyPagesForGeneration = storyPages.map((pageText, index) => ({
           page_number: index + 1,
