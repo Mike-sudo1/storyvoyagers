@@ -1,10 +1,16 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,87 +18,183 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Function started successfully');
-    
-    const requestBody = await req.json();
-    const { story_id, child_id, story_pages } = requestBody;
-    
-    console.log('Received request for story:', story_id, 'child:', child_id);
-    
-    if (!story_pages || story_pages.length === 0) {
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'No pages to process',
-        results: [],
-        total_pages: 0,
-        generated_count: 0,
-        cached_count: 0,
-        error_count: 0
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const {
+      story_id,
+      child_id,
+      story_pages,
+      child_avatar_url,
+      character_prompt,
+      style_prompt = "colorful watercolor cartoon, clean outlines, semi-stylized background"
+    } = await req.json();
+
+    console.log('Generating illustrations for story:', { story_id, child_id, pages: story_pages.length });
 
     const openAIKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIKey) {
-      console.error('OpenAI API key not found');
-      return new Response(JSON.stringify({
-        error: 'OpenAI API key not configured'
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      throw new Error('OpenAI API key not configured');
     }
-    
-    console.log('OpenAI key found, testing API...');
-    
-    // Test OpenAI API with simple request
-    const testResponse = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'dall-e-2',
-        prompt: 'a simple cartoon cat',
-        n: 1,
-        size: '256x256'
-      }),
-    });
-    
-    console.log('OpenAI API response status:', testResponse.status);
-    
-    if (!testResponse.ok) {
-      const errorText = await testResponse.text();
-      console.error('OpenAI API error:', errorText);
-      return new Response(JSON.stringify({
-        error: `OpenAI API test failed: ${testResponse.status}`
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+
+    // Check existing illustrations to avoid regeneration
+    const { data: existing } = await supabase
+      .from('story_illustrations')
+      .select('page_number, image_url, generation_status')
+      .eq('story_id', story_id)
+      .eq('child_id', child_id);
+
+    const existingPages = new Set(existing?.map(img => img.page_number) || []);
+    const results: any[] = [];
+
+    // Process each page
+    for (let i = 0; i < story_pages.length; i++) {
+      const page = story_pages[i];
+      const page_number = page.page_number || i + 1;
+
+      // Skip if already generated successfully
+      if (existingPages.has(page_number)) {
+        const existingPage = existing?.find(p => p.page_number === page_number);
+        if (existingPage?.generation_status === 'success') {
+          results.push({
+            page_number,
+            status: 'cached',
+            image_url: existingPage.image_url
+          });
+          continue;
+        }
+      }
+
+      try {
+        // Update status to generating
+        await supabase
+          .from('story_illustrations')
+          .upsert({
+            story_id,
+            child_id,
+            page_number,
+            generation_status: 'generating',
+            image_url: '',
+            prompt_used: ''
+          });
+
+        // Build contextual prompt
+        const continuityContext = i > 0 ? `This continues from previous scene. ` : '';
+        const fullPrompt = `${continuityContext}${page.text}
+
+Featuring the main character: ${character_prompt}.
+Style: ${style_prompt}.
+The character should maintain consistent appearance throughout the story - same clothes, hairstyle, and facial features.
+${i > 0 ? 'Ensure visual continuity with the previous scenes.' : ''}`;
+
+        console.log(`Generating page ${page_number} with prompt:`, fullPrompt);
+
+        // Generate image with DALL-E (gpt-image-1)
+        const dalleResponse = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-image-1',
+            prompt: fullPrompt,
+            n: 1,
+            size: '1024x1024',
+            quality: 'high',
+            output_format: 'png'
+          }),
+        });
+
+        if (!dalleResponse.ok) {
+          const errorText = await dalleResponse.text();
+          throw new Error(`DALL-E API error: ${dalleResponse.status} ${errorText}`);
+        }
+
+        const dalleResult = await dalleResponse.json();
+        if (!dalleResult.data || dalleResult.data.length === 0) {
+          throw new Error('No images returned from DALL-E');
+        }
+
+        // DALL-E gpt-image-1 returns base64, convert to blob for upload
+        const base64Data = dalleResult.data[0].b64_json;
+        const imageBlob = new Blob([
+          Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
+        ], { type: 'image/png' });
+
+        // Upload to Supabase Storage
+        const fileName = `rendered/${child_id}/${story_id}/page_${page_number}.png`;
+        const { error: uploadError } = await supabase.storage
+          .from('StoryVoyagers')
+          .upload(fileName, imageBlob, {
+            contentType: 'image/png',
+            upsert: true
+          });
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        // Get public URL
+        const publicUrl = supabase.storage
+          .from('StoryVoyagers')
+          .getPublicUrl(fileName).data.publicUrl;
+
+        // Update with success
+        await supabase
+          .from('story_illustrations')
+          .upsert({
+            story_id,
+            child_id,
+            page_number,
+            generation_status: 'success',
+            image_url: publicUrl,
+            prompt_used: fullPrompt
+          });
+
+        results.push({
+          page_number,
+          status: 'generated',
+          image_url: publicUrl
+        });
+
+        console.log(`Successfully generated page ${page_number}`);
+
+      } catch (error) {
+        console.error(`Error generating page ${page_number}:`, error);
+        
+        // Update with error status
+        await supabase
+          .from('story_illustrations')
+          .upsert({
+            story_id,
+            child_id,
+            page_number,
+            generation_status: 'error',
+            image_url: '',
+            prompt_used: fullPrompt || ''
+          });
+
+        results.push({
+          page_number,
+          status: 'error',
+          error: (error as Error).message
+        });
+      }
     }
-    
-    // If we get here, OpenAI API is working
+
     return new Response(JSON.stringify({
       success: true,
-      message: 'OpenAI API test successful',
-      results: [],
+      results,
       total_pages: story_pages.length,
-      generated_count: 0,
-      cached_count: 0,
-      error_count: 0
+      generated_count: results.filter(r => r.status === 'generated').length,
+      cached_count: results.filter(r => r.status === 'cached').length,
+      error_count: results.filter(r => r.status === 'error').length
     }), {
-      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in function:', error);
+    console.error('Error in generate-illustrated-story:', error);
     return new Response(JSON.stringify({
-      error: `Function error: ${error.message}`
+      error: (error as Error).message
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
