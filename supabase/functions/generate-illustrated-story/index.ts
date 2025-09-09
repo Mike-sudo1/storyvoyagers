@@ -94,12 +94,12 @@ ${i > 0 ? 'Ensure visual continuity with the previous scenes.' : ''}`;
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-image-1',
+            model: 'dall-e-3',
             prompt: fullPrompt,
             n: 1,
             size: '1024x1024',
-            quality: 'high',
-            output_format: 'png'
+            quality: 'hd',
+            response_format: 'url'
           }),
         });
 
@@ -113,11 +113,10 @@ ${i > 0 ? 'Ensure visual continuity with the previous scenes.' : ''}`;
           throw new Error('No images returned from DALL-E');
         }
 
-        // DALL-E gpt-image-1 returns base64, convert to blob for upload
-        const base64Data = dalleResult.data[0].b64_json;
-        const imageBlob = new Blob([
-          Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
-        ], { type: 'image/png' });
+        // DALL-E 3 returns URL, fetch and convert to blob for upload
+        const imageUrl = dalleResult.data[0].url;
+        const imageResponse = await fetch(imageUrl);
+        const imageBlob = await imageResponse.blob();
 
         // Upload to Supabase Storage
         const fileName = `rendered/${child_id}/${story_id}/page_${page_number}.png`;
