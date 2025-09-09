@@ -86,7 +86,9 @@ ${i > 0 ? 'Ensure visual continuity with the previous scenes.' : ''}`;
 
         console.log(`Generating page ${page_number} with prompt:`, fullPrompt);
 
-        // Generate image with DALL-E
+        console.log(`Generating image for page ${page_number} with DALL-E...`);
+        
+        // Generate image with DALL-E 2 (more stable)
         const dalleResponse = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',
           headers: {
@@ -94,28 +96,34 @@ ${i > 0 ? 'Ensure visual continuity with the previous scenes.' : ''}`;
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'dall-e-3',
-            prompt: fullPrompt,
+            model: 'dall-e-2',
+            prompt: fullPrompt.substring(0, 1000), // DALL-E 2 has 1000 char limit
             n: 1,
             size: '1024x1024',
-            quality: 'hd',
             response_format: 'url'
           }),
         });
 
         if (!dalleResponse.ok) {
           const errorText = await dalleResponse.text();
+          console.error(`DALL-E API error: ${dalleResponse.status} ${errorText}`);
           throw new Error(`DALL-E API error: ${dalleResponse.status} ${errorText}`);
         }
 
         const dalleResult = await dalleResponse.json();
         if (!dalleResult.data || dalleResult.data.length === 0) {
+          console.error('No images returned from DALL-E');
           throw new Error('No images returned from DALL-E');
         }
 
-        // DALL-E 3 returns URL, fetch and convert to blob for upload
+        // DALL-E returns URL, fetch and convert to blob for upload
         const imageUrl = dalleResult.data[0].url;
+        console.log(`Fetching generated image from: ${imageUrl.substring(0, 50)}...`);
+        
         const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to fetch generated image: ${imageResponse.status}`);
+        }
         const imageBlob = await imageResponse.blob();
 
         // Upload to Supabase Storage
