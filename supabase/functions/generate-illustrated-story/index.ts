@@ -111,9 +111,7 @@ ${i > 0 ? 'Ensure visual continuity with the previous scenes.' : ''}`;
 
         console.log(`Generating page ${page_number} with prompt:`, fullPrompt);
 
-        console.log(`Generating image for page ${page_number} with DALL-E...`);
-        
-        // Generate image with DALL-E 2 (more stable)
+        // Try GPT Image 1 first (returns base64 PNG)
         const dalleResponse = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',
           headers: {
@@ -121,35 +119,35 @@ ${i > 0 ? 'Ensure visual continuity with the previous scenes.' : ''}`;
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'dall-e-2',
-            prompt: fullPrompt.substring(0, 1000), // DALL-E 2 has 1000 char limit
+            model: 'gpt-image-1',
+            prompt: fullPrompt,
             n: 1,
             size: '1024x1024',
-            response_format: 'url'
+            quality: 'high',
+            output_format: 'png'
           }),
         });
 
         if (!dalleResponse.ok) {
           const errorText = await dalleResponse.text();
-          console.error(`DALL-E API error: ${dalleResponse.status} ${errorText}`);
-          throw new Error(`DALL-E API error: ${dalleResponse.status} ${errorText}`);
+          console.error(`OpenAI images API error: ${dalleResponse.status} ${errorText}`);
+          throw new Error(`OpenAI images API error: ${dalleResponse.status}`);
         }
 
         const dalleResult = await dalleResponse.json();
         if (!dalleResult.data || dalleResult.data.length === 0) {
-          console.error('No images returned from DALL-E');
-          throw new Error('No images returned from DALL-E');
+          console.error('No images returned from OpenAI');
+          throw new Error('No images returned from OpenAI');
         }
 
-        // DALL-E returns URL, fetch and convert to blob for upload
-        const imageUrl = dalleResult.data[0].url;
-        console.log(`Fetching generated image from: ${imageUrl.substring(0, 50)}...`);
-        
-        const imageResponse = await fetch(imageUrl);
-        if (!imageResponse.ok) {
-          throw new Error(`Failed to fetch generated image: ${imageResponse.status}`);
+        // Convert base64 to Blob for upload
+        const base64Data = dalleResult.data[0].b64_json;
+        const binary = atob(base64Data);
+        const bytes = new Uint8Array(binary.length);
+        for (let j = 0; j < binary.length; j++) {
+          bytes[j] = binary.charCodeAt(j);
         }
-        const imageBlob = await imageResponse.blob();
+        const imageBlob = new Blob([bytes], { type: 'image/png' });
 
         // Upload to Supabase Storage
         const fileName = `rendered/${child_id}/${story_id}/page_${page_number}.png`;
