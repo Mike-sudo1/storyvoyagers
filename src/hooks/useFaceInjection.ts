@@ -17,6 +17,7 @@ export interface InjectParams {
   pageIndex: number;
   emotion?: 'happy' | 'curious' | 'surprised' | 'excited' | 'thoughtful' | 'confident';
   faceAnchor?: FaceAnchor;
+  storyText?: string; // Add story text for emotion detection
 }
 
 export const useFaceInjection = () => {
@@ -97,71 +98,78 @@ export const useFaceInjection = () => {
         console.log('Detected face circle:', circle);
       }
 
-      // 5) Completely clear the placeholder area (remove white circle and any text)
+      // 5) Completely erase the placeholder area (remove white circle and text)
       ctx.save();
       
-      // First, cut out the entire circular area
+      // Use destination-out to completely remove the circular area
       ctx.globalCompositeOperation = 'destination-out';
       ctx.beginPath();
-      ctx.arc(circle.x, circle.y, circle.r * 1.1, 0, Math.PI * 2); // Slightly larger to ensure complete removal
+      ctx.arc(circle.x, circle.y, circle.r * 1.2, 0, Math.PI * 2); // Extra large radius to ensure complete removal
       ctx.fill();
       
-      // Also clear any potential text or artifacts in a larger rectangular area
-      const clearWidth = circle.r * 2.2;
-      const clearHeight = circle.r * 2.2;
+      // Also clear a rectangular area to remove any text artifacts
       ctx.clearRect(
-        circle.x - clearWidth / 2,
-        circle.y - clearHeight / 2,
-        clearWidth,
-        clearHeight
+        circle.x - circle.r * 1.5,
+        circle.y - circle.r * 1.5,
+        circle.r * 3,
+        circle.r * 3
       );
+      
       ctx.restore();
 
-      // 6) Extract and prepare face region from avatar
-      const faceCanvas = extractFaceRegionCanvas(avatarImg);
-      const adjustedFace = await applyEmotionTintToCanvas(faceCanvas, params.emotion || 'happy');
+      // 6) Extract and prepare the face with better cropping
+      const faceCanvas = extractFaceOnly(avatarImg);
+      const emotionalFace = await applyStoryEmotion(faceCanvas, params.storyText || '', params.emotion);
 
-      // 7) Draw the face into the circle with proper masking
+      // 7) Apply the face with perfect circular masking and scaling
       ctx.save();
       
-      // Create perfect circular mask for the face
+      // Create a tight circular clipping mask
       ctx.beginPath();
-      ctx.arc(circle.x, circle.y, circle.r * 0.95, 0, Math.PI * 2); // Slightly smaller for clean edges
+      ctx.arc(circle.x, circle.y, circle.r * 0.92, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
 
-      // Calculate optimal scaling - face should fill most of the circle
-      const targetFaceSize = circle.r * 1.9; // Face fills 95% of circle diameter
-      const faceScale = targetFaceSize / Math.max(faceCanvas.width, faceCanvas.height);
+      // Calculate face scaling to fill the circle naturally
+      const targetSize = circle.r * 1.85; // Face should fill most of the circle
+      const faceScale = targetSize / Math.max(faceCanvas.width, faceCanvas.height);
       const scaledWidth = faceCanvas.width * faceScale;
       const scaledHeight = faceCanvas.height * faceScale;
       
-      // Center the face precisely in the circle
+      // Center the face precisely
       const faceX = circle.x - scaledWidth / 2;
       const faceY = circle.y - scaledHeight / 2;
       
-      // Draw the cropped and adjusted face
+      // Draw the cropped face
       ctx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(adjustedFace, faceX, faceY, scaledWidth, scaledHeight);
+      ctx.drawImage(emotionalFace, faceX, faceY, scaledWidth, scaledHeight);
       
       ctx.restore();
 
-      // 8) Apply subtle integration effects for natural blending
+      // 8) Add subtle integration effects
       ctx.save();
       
-      // Soft shadow/depth effect around the face edge
-      const shadowGradient = ctx.createRadialGradient(
-        circle.x, circle.y, circle.r * 0.7, 
-        circle.x, circle.y, circle.r * 0.98
+      // Soft edge gradient for natural blending
+      const edgeGradient = ctx.createRadialGradient(
+        circle.x, circle.y, circle.r * 0.75, 
+        circle.x, circle.y, circle.r * 0.92
       );
-      shadowGradient.addColorStop(0, 'rgba(0,0,0,0)');
-      shadowGradient.addColorStop(1, 'rgba(0,0,0,0.08)');
+      edgeGradient.addColorStop(0, 'rgba(0,0,0,0)');
+      edgeGradient.addColorStop(1, 'rgba(0,0,0,0.12)');
       
       ctx.globalCompositeOperation = 'multiply';
       ctx.beginPath();
-      ctx.arc(circle.x, circle.y, circle.r * 0.95, 0, Math.PI * 2);
-      ctx.fillStyle = shadowGradient;
+      ctx.arc(circle.x, circle.y, circle.r * 0.92, 0, Math.PI * 2);
+      ctx.fillStyle = edgeGradient;
       ctx.fill();
+      
+      // Subtle outline for illustration integration
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.beginPath();
+      ctx.arc(circle.x, circle.y, circle.r * 0.92, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
       
       ctx.restore();
 
@@ -342,7 +350,7 @@ async function applyEmotionTint(avatar: HTMLImageElement, emotion: InjectParams[
   return adjusted;
 }
 
-function extractFaceRegionCanvas(avatar: HTMLImageElement): HTMLCanvasElement {
+function extractFaceOnly(avatar: HTMLImageElement): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Could not get canvas context for face extraction');
@@ -350,64 +358,127 @@ function extractFaceRegionCanvas(avatar: HTMLImageElement): HTMLCanvasElement {
   const originalWidth = avatar.naturalWidth;
   const originalHeight = avatar.naturalHeight;
 
-  // Crop to face region - focus on upper 70% and center horizontally
-  // This excludes shirts/bodies and focuses on head/face area
-  const faceWidth = Math.min(originalWidth * 0.9, originalHeight * 0.7);
-  const faceHeight = faceWidth; // Square crop for circular insertion
+  // Aggressive face-only cropping - focus on head area only
+  // Target the upper 60% of the image, center horizontally
+  const faceWidth = Math.min(originalWidth * 0.75, originalHeight * 0.6); // Smaller crop for face-only
+  const faceHeight = faceWidth; // Keep square for circular insertion
   
-  // Position crop to capture face (upper-center area)
+  // Position to capture face area (upper portion, centered)
   const cropX = (originalWidth - faceWidth) / 2;
-  const cropY = Math.max(0, originalHeight * 0.05); // Start from top 5% to capture full head
+  const cropY = Math.max(0, originalHeight * 0.08); // Start higher up to get forehead
 
+  // Set canvas to face dimensions
   canvas.width = faceWidth;
   canvas.height = faceHeight;
 
-  // Draw the cropped face region
+  // Draw the tight face crop
   ctx.drawImage(
     avatar,
     cropX, cropY, faceWidth, Math.min(faceHeight, originalHeight - cropY), // Source crop
-    0, 0, faceWidth, faceHeight                                             // Destination
+    0, 0, faceWidth, faceHeight                                            // Destination
   );
 
+  // Apply aggressive circular masking to remove background
+  const imageData = ctx.getImageData(0, 0, faceWidth, faceHeight);
+  const data = imageData.data;
+  const centerX = faceWidth / 2;
+  const centerY = faceHeight / 2;
+  const radius = Math.min(faceWidth, faceHeight) / 2.2; // Smaller radius for tighter face crop
+
+  // Apply circular mask with soft feathering
+  for (let y = 0; y < faceHeight; y++) {
+    for (let x = 0; x < faceWidth; x++) {
+      const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+      let alpha = 1;
+      
+      if (distance > radius) {
+        // Outside radius - fade out
+        const fadeDistance = Math.min(15, radius * 0.1);
+        alpha = Math.max(0, (radius + fadeDistance - distance) / fadeDistance);
+      }
+      
+      const pixelIndex = (y * faceWidth + x) * 4;
+      data[pixelIndex + 3] = data[pixelIndex + 3] * alpha;
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
   return canvas;
 }
 
-async function applyEmotionTintToCanvas(canvas: HTMLCanvasElement, emotion: InjectParams['emotion'] = 'happy'): Promise<HTMLCanvasElement> {
-  const tintCanvas = document.createElement('canvas');
-  const ctx = tintCanvas.getContext('2d');
+function detectEmotionFromText(storyText: string): 'happy' | 'curious' | 'surprised' | 'excited' | 'thoughtful' | 'confident' {
+  const text = storyText.toLowerCase();
+  
+  // Emotion detection patterns
+  if (text.includes('smiled') || text.includes('happy') || text.includes('laughed') || text.includes('joy')) {
+    return 'happy';
+  }
+  if (text.includes('stepped forward') || text.includes('confident') || text.includes('boldly') || text.includes('determined')) {
+    return 'confident';
+  }
+  if (text.includes('curious') || text.includes('wondered') || text.includes('explore') || text.includes('mystery')) {
+    return 'curious';
+  }
+  if (text.includes('surprised') || text.includes('amazed') || text.includes('gasped') || text.includes('wow')) {
+    return 'surprised';
+  }
+  if (text.includes('excited') || text.includes('eager') || text.includes('thrilled') || text.includes('adventure')) {
+    return 'excited';
+  }
+  if (text.includes('thought') || text.includes('pondered') || text.includes('considered') || text.includes('carefully')) {
+    return 'thoughtful';
+  }
+  
+  // Default to curious for educational content
+  return 'curious';
+}
+
+async function applyStoryEmotion(
+  canvas: HTMLCanvasElement, 
+  storyText: string, 
+  fallbackEmotion?: InjectParams['emotion']
+): Promise<HTMLCanvasElement> {
+  const emotionCanvas = document.createElement('canvas');
+  const ctx = emotionCanvas.getContext('2d');
   if (!ctx) return canvas;
 
-  tintCanvas.width = canvas.width;
-  tintCanvas.height = canvas.height;
+  emotionCanvas.width = canvas.width;
+  emotionCanvas.height = canvas.height;
   
   // Draw the original face
   ctx.drawImage(canvas, 0, 0);
 
-  // Apply emotion-based tint
+  // Detect emotion from story text or use fallback
+  const detectedEmotion = detectEmotionFromText(storyText);
+  const emotion = detectedEmotion || fallbackEmotion || 'happy';
+
+  console.log(`Applying emotion: ${emotion} (detected from: "${storyText.substring(0, 100)}...")`);
+
+  // Apply emotion-appropriate color adjustments
   ctx.globalCompositeOperation = 'overlay';
   switch (emotion) {
     case 'happy':
-      ctx.fillStyle = 'rgba(255, 235, 59, 0.08)';
+      ctx.fillStyle = 'rgba(255, 235, 59, 0.12)'; // Warm yellow
       break;
     case 'curious':
-      ctx.fillStyle = 'rgba(33, 150, 243, 0.06)';
+      ctx.fillStyle = 'rgba(33, 150, 243, 0.10)'; // Blue tint
       break;
     case 'surprised':
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; // Bright highlight
       break;
     case 'excited':
-      ctx.fillStyle = 'rgba(255, 152, 0, 0.08)';
+      ctx.fillStyle = 'rgba(255, 152, 0, 0.12)'; // Orange energy
       break;
     case 'thoughtful':
-      ctx.fillStyle = 'rgba(96, 125, 139, 0.08)';
+      ctx.fillStyle = 'rgba(96, 125, 139, 0.10)'; // Muted blue-gray
       break;
     case 'confident':
-      ctx.fillStyle = 'rgba(139, 195, 74, 0.08)';
+      ctx.fillStyle = 'rgba(139, 195, 74, 0.10)'; // Green confidence
       break;
     default:
-      return canvas; // No tint
+      return canvas; // No adjustment
   }
   
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  return tintCanvas;
+  return emotionCanvas;
 }
