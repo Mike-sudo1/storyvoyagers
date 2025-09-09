@@ -253,6 +253,42 @@ export type Database = {
         }
         Relationships: []
       }
+      story_illustrations: {
+        Row: {
+          child_id: string
+          created_at: string
+          generation_status: string
+          id: string
+          image_url: string
+          page_number: number
+          prompt_used: string | null
+          story_id: string
+          updated_at: string
+        }
+        Insert: {
+          child_id: string
+          created_at?: string
+          generation_status?: string
+          id?: string
+          image_url: string
+          page_number: number
+          prompt_used?: string | null
+          story_id: string
+          updated_at?: string
+        }
+        Update: {
+          child_id?: string
+          created_at?: string
+          generation_status?: string
+          id?: string
+          image_url?: string
+          page_number?: number
+          prompt_used?: string | null
+          story_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

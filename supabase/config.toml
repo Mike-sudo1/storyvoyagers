@@ -51,3 +51,6 @@ verify_jwt = false
 
 [functions.inject-avatar]
 verify_jwt = false
+
+[functions.generate-illustrated-story]
+verify_jwt = true

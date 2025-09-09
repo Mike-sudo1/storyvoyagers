@@ -14,6 +14,7 @@ import { usePersonalizedImage } from "@/hooks/usePersonalizedImage";
 import { useFaceInjection } from "@/hooks/useFaceInjection";
 import { useDalleFaceInjection } from "@/hooks/useDalleFaceInjection";
 import { useAvatarInjection, detectEmotionFromText } from "@/hooks/useAvatarInjection";
+import { useStoryIllustrations } from "@/hooks/useStoryIllustrations";
 import { ChildSelector } from "@/components/ChildSelector";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import threePigsPage1 from "@/assets/three-pigs-page1.jpg";
@@ -56,6 +57,15 @@ const StoryReader = () => {
   const { injectAvatarIntoImage, isInjecting } = useFaceInjection();
   const { injectFaceWithDalle, isProcessing: isDalleProcessing } = useDalleFaceInjection();
   const { injectAvatar, isProcessing: isAvatarProcessing, getInjectedImageUrl } = useAvatarInjection();
+  const { 
+    progress, 
+    illustrations, 
+    generateStoryIllustrations, 
+    checkExistingIllustrations, 
+    getIllustrationUrl, 
+    buildCharacterPrompt,
+    resetProgress 
+  } = useStoryIllustrations();
 
   // Get personalized content - this needs to be computed before useEffect
   const getPersonalizedContent = () => {
@@ -176,17 +186,58 @@ const StoryReader = () => {
     }
   };
 
-  // useEffect for loading personalized images
+  // useEffect for generating/loading AI story illustrations
+  useEffect(() => {
+    const initializeStoryIllustrations = async () => {
+      if (!story || !selectedChild || !selectedChild.avatar_url) return;
+
+      // Check if illustrations already exist
+      const hasExisting = await checkExistingIllustrations(story.id, selectedChild.id);
+      
+      if (!hasExisting && story.content) {
+        // Generate story pages for illustration
+        const storyPagesForGeneration = storyPages.map((pageText, index) => ({
+          page_number: index + 1,
+          text: pageText
+        }));
+
+        // Build character prompt from child data
+        const characterPrompt = buildCharacterPrompt(selectedChild);
+        
+        // Generate illustrations
+        await generateStoryIllustrations(
+          story.id,
+          selectedChild.id,
+          storyPagesForGeneration,
+          selectedChild.avatar_url,
+          characterPrompt,
+          "colorful cartoon illustration, storybook style, warm lighting, child-friendly"
+        );
+      }
+    };
+
+    initializeStoryIllustrations();
+  }, [story?.id, selectedChild?.id, selectedChild?.avatar_url]);
+
+  // useEffect for loading personalized images (fallback to old system)
   useEffect(() => {
     const run = async () => {
       if (story && selectedChild) {
+        // First try to get AI-generated illustration
+        const aiIllustration = getIllustrationUrl(currentPage + 1);
+        if (aiIllustration) {
+          setCurrentImageUrl(aiIllustration);
+          return;
+        }
+        
+        // Fallback to old personalization system
         await loadPersonalizedImage(currentPage);
       } else {
         setCurrentImageUrl(null);
       }
     };
     run();
-  }, [currentPage, selectedChild?.id, story?.id]);
+  }, [currentPage, selectedChild?.id, story?.id, illustrations]);
 
   // Helper functions
   const handlePreviousPage = () => {
@@ -246,6 +297,80 @@ const StoryReader = () => {
           onContinue={() => setShowChildSelector(false)}
           storyTitle={story.title}
         />
+        <Footer />
+      </div>
+    );
+  }
+
+  // Show generation progress if illustrations are being generated
+  if (progress.status === 'generating') {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="container max-w-4xl py-16">
+          <div className="text-center space-y-6">
+            <h1 className="text-3xl font-bold">Creating Your Personalized Story</h1>
+            <p className="text-muted-foreground text-lg">
+              We're generating beautiful illustrations featuring {selectedChild?.name}...
+            </p>
+            
+            <div className="max-w-md mx-auto space-y-4">
+              <div className="w-full bg-secondary rounded-full h-2">
+                <div 
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{ 
+                    width: `${Math.round((progress.completed_pages / progress.total_pages) * 100)}%` 
+                  }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Generating page {progress.current_page} of {progress.total_pages}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                This may take a few minutes. Please don't close this page.
+              </p>
+            </div>
+
+            <div className="flex justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Show error if generation failed
+  if (progress.status === 'error') {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="container max-w-4xl py-16">
+          <div className="text-center space-y-6">
+            <h1 className="text-3xl font-bold text-destructive">Generation Failed</h1>
+            <p className="text-muted-foreground text-lg">
+              We couldn't generate the illustrations for this story.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Error: {progress.error}
+            </p>
+            <div className="space-x-4">
+              <Button onClick={() => navigate('/explore')} variant="outline">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Explore
+              </Button>
+              <Button 
+                onClick={() => {
+                  resetProgress();
+                  window.location.reload();
+                }}
+              >
+                Try Again
+              </Button>
+            </div>
+          </div>
+        </div>
         <Footer />
       </div>
     );
