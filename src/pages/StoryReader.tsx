@@ -313,19 +313,24 @@ const StoryReader = () => {
 
               {/* Story illustration */}
               {(currentImageUrl || getStoryImage(currentPage) || currentIllustration?.image_url || currentIllustration?.image) && (
-                <div className="relative mb-8 mx-auto max-w-2xl">
-                  {(loadingImage || isDalleProcessing) && (
-                    <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                        <p className="text-sm text-muted-foreground">
-                          {isDalleProcessing ? "Creating personalized illustration with AI..." : "Personalizing illustration..."}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {!(loadingImage || isDalleProcessing) && (
+                 <div className="relative mb-8 mx-auto max-w-2xl">
+                   {(loadingImage || isDalleProcessing || isAvatarProcessing) && (
+                     <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
+                       <div className="text-center">
+                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                         <p className="text-sm text-muted-foreground">
+                           {isAvatarProcessing 
+                             ? "Injecting avatar into story..." 
+                             : isDalleProcessing 
+                             ? "Creating personalized illustration with AI..." 
+                             : "Personalizing illustration..."
+                           }
+                         </p>
+                       </div>
+                     </div>
+                   )}
+                   
+                   {!(loadingImage || isDalleProcessing || isAvatarProcessing) && (
                     <img 
                       src={
                         currentImageUrl || 
