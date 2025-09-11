@@ -28,13 +28,17 @@ export const useIllustrationGeneration = () => {
     setError(null);
 
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('generate-story-illustration', {
+      const { data, error: functionError } = await supabase.functions.invoke('generate-story-illustration-replicate', {
         body: {
-          prompt: params.prompt,
-          childFeatures: params.childFeatures,
-          avatarUrl: params.avatarUrl,
-          style: params.style || 'cartoon',
-          size: params.size || '1024x768'
+          prompt: `Full-page storybook illustration. Scene: ${params.prompt}. 
+Featuring the main character: ${params.childFeatures.name}, age ${params.childFeatures.age}, with ${params.childFeatures.skinTone} skin, ${params.childFeatures.hairColor} ${params.childFeatures.hairStyle} hair, ${params.childFeatures.eyeColor} eyes, and ${params.childFeatures.faceShape} face shape.
+Style: ${params.style || 'colorful cartoon illustration, Pixar-style, storybook art, child-friendly'}.
+The character should maintain consistent appearance throughout the story - same clothes, hairstyle, and facial features.
+High quality, professional children's book illustration, vibrant colors, detailed background.`,
+          negative_prompt: "blurry, low quality, distorted, ugly, bad anatomy, extra limbs, watermark, signature, text, letters",
+          width: parseInt(params.size?.split('x')[0] || '1024'),
+          height: parseInt(params.size?.split('x')[1] || '768'),
+          style: params.style || 'cartoon'
         }
       });
 

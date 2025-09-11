@@ -1,6 +1,6 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import Replicate from "https://esm.sh/replicate@0.25.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,10 +29,12 @@ serve(async (req) => {
 
     console.log('Generating illustrations for story:', { story_id, child_id, pages: story_pages.length });
 
-    const openAIKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIKey) {
-      throw new Error('OpenAI API key not configured');
+    const replicateApiToken = Deno.env.get('REPLICATE_API_TOKEN');
+    if (!replicateApiToken) {
+      throw new Error('Replicate API token not configured');
     }
+
+    const replicate = new Replicate({ auth: replicateApiToken });
 
     // Check existing illustrations to avoid regeneration
     const { data: existing } = await supabase
@@ -75,49 +77,49 @@ serve(async (req) => {
             prompt_used: ''
           });
 
-        // Build contextual prompt
+        // Build contextual prompt for Stable Diffusion
         const continuityContext = i > 0 ? `This continues from previous scene. ` : '';
-        const fullPrompt = `${continuityContext}${page.text}
-
+        const fullPrompt = `Full-page storybook illustration. Scene: ${page.text}. 
+${continuityContext}
 Featuring the main character: ${character_prompt}.
 Style: ${style_prompt}.
 The character should maintain consistent appearance throughout the story - same clothes, hairstyle, and facial features.
-${i > 0 ? 'Ensure visual continuity with the previous scenes.' : ''}`;
+${i > 0 ? 'Ensure visual continuity with the previous scenes.' : ''}
+High quality, professional children's book illustration, vibrant colors, detailed background.`;
 
         console.log(`Generating page ${page_number} with prompt:`, fullPrompt);
 
-        // Generate image with DALL-E (gpt-image-1)
-        const dalleResponse = await fetch('https://api.openai.com/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-image-1',
-            prompt: fullPrompt,
-            n: 1,
-            size: '1024x1024',
-            quality: 'high',
-            output_format: 'png'
-          }),
-        });
+        // Generate image with Replicate Stable Diffusion
+        const output = await replicate.run(
+          "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+          {
+            input: {
+              prompt: fullPrompt,
+              negative_prompt: "blurry, low quality, distorted, ugly, bad anatomy, extra limbs, watermark, signature, text, letters",
+              width: 1024,
+              height: 1024,
+              num_outputs: 1,
+              scheduler: "DPMSolverMultistep",
+              num_inference_steps: 25,
+              guidance_scale: 7.5,
+              seed: Math.floor(Math.random() * 1000000),
+            }
+          }
+        );
 
-        if (!dalleResponse.ok) {
-          const errorText = await dalleResponse.text();
-          throw new Error(`DALL-E API error: ${dalleResponse.status} ${errorText}`);
+        if (!output || !output[0]) {
+          throw new Error('No images returned from Replicate');
         }
 
-        const dalleResult = await dalleResponse.json();
-        if (!dalleResult.data || dalleResult.data.length === 0) {
-          throw new Error('No images returned from DALL-E');
+        // Download the generated image
+        const generatedImageUrl = output[0];
+        const imageResponse = await fetch(generatedImageUrl);
+        
+        if (!imageResponse.ok) {
+          throw new Error('Failed to download generated image');
         }
 
-        // DALL-E gpt-image-1 returns base64, convert to blob for upload
-        const base64Data = dalleResult.data[0].b64_json;
-        const imageBlob = new Blob([
-          Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
-        ], { type: 'image/png' });
+        const imageBlob = await imageResponse.blob();
 
         // Upload to Supabase Storage
         const fileName = `rendered/${child_id}/${story_id}/page_${page_number}.png`;
@@ -169,7 +171,7 @@ ${i > 0 ? 'Ensure visual continuity with the previous scenes.' : ''}`;
             page_number,
             generation_status: 'error',
             image_url: '',
-            prompt_used: fullPrompt || ''
+            prompt_used: fullPrompt || page.text
           });
 
         results.push({

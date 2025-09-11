@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Replicate from "https://esm.sh/replicate@0.25.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,31 +9,17 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const STYLE_PROMPT = `Stylize THIS EXACT PHOTO into a cozy children's-book illustration while preserving the subject's identity and scene.
-
-STYLE
-- Clean, bold outlines (consistent line weight), smooth vector-like shapes
-- Bright but gentle colors with soft gradients (no harsh shadows)
-- Childlike proportions: slightly oversized head, rounded features
-- Warm "bedtime story" vibe similar to modern PBS Kids storybooks
-- Background simplified and uncluttered (flat shapes, soft clouds, tiny stars if night)
-
-STRICT LIKENESS (highest priority — use the input photo as the structural reference)
-- Preserve the subject’s DISTINCT facial geometry: overall face shape, eye shape/spacing, nose width/length, mouth shape, eyebrow thickness/angle, ears
-- Keep the exact HAIRSTYLE (length, part, curl/texture), hairline, and natural hair color
-- Match true SKIN TONE and undertone (do not lighten or darken)
-- Copy CLOTHING colors/patterns and accessories (glasses, headbands, hats, earrings)
-- Keep the same POSE, head tilt, camera angle, and FOV as the photo
-- Maintain LIGHTING direction and key highlight/shadow placements, translated into soft storybook shading
-- Include key SCENE ANCHORS (e.g., telescope, distinctive furniture) simplified into flat, readable shapes
-- Use the input photo’s color palette when possible
-
-DO NOT
-- Do not replace features with generic/idealized ones
-- Do not change hair color, skin tone, or clothing colors
-- Do not invent new backgrounds or props unless missing; prefer simplifying what's present
-- No photorealism, no sketchy pencil lines, no anime/manga look, no halftone/comic dots
-`;
+const CARTOON_PROMPT = `Transform this photo into a vibrant cartoon character portrait. 
+Create a Pixar-style 2D illustration with:
+- Clean, smooth cartoon features
+- Bright, cheerful colors
+- Simplified facial features while maintaining recognizable characteristics
+- Consistent cartoon styling
+- Child-friendly appearance
+- Symmetrical face positioning
+- Clear, well-defined outlines
+- Professional animation quality
+The result should look like a character from a modern animated movie, suitable for children's storybooks.`;
 
 function pngBlobFromB64(b64: string): Blob {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -93,65 +80,52 @@ serve(async (req) => {
       });
     }
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
-    if (!OPENAI_API_KEY) {
-      return new Response(JSON.stringify({ error: "Missing OPENAI_API_KEY" }), {
+    const replicateApiToken = Deno.env.get("REPLICATE_API_TOKEN") ?? "";
+    if (!replicateApiToken) {
+      return new Response(JSON.stringify({ error: "Missing REPLICATE_API_TOKEN" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const replicate = new Replicate({ auth: replicateApiToken });
+
     // Convert uploaded file to base64 (safe for large files)
     const arrayBuffer = await file.arrayBuffer();
     const base64Image = bytesToBase64(new Uint8Array(arrayBuffer));
 
-    // Call OpenAI edit endpoint
-    const openAIResponse = await fetch("https://api.openai.com/v1/images/edits", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-image-1",
-        image: `data:image/${file.type.split("/")[1]};base64,${base64Image}`,
-        prompt: STYLE_PROMPT,
-        n: 1,
-        size: "1024x1024",
-      }),
-    });
+    console.log('Processing image for child:', childId);
+    console.log('Calling Replicate API for image transformation...');
 
-    let imageBlob: Blob;
-
-    if (openAIResponse.ok) {
-      const result = await openAIResponse.json();
-      const b64 = result?.data?.[0]?.b64_json;
-      if (!b64) throw new Error("OpenAI edit: missing b64_json");
-      imageBlob = pngBlobFromB64(b64);
-    } else {
-      // Fallback: generate (does not preserve photo likeness, but keeps style)
-      const genResponse = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-image-1",
-          prompt: `Portrait, front-and-center composition. ${STYLE_PROMPT}`,
-          n: 1,
-          size: "1024x1024",
-        }),
-      });
-
-      const genJson = await genResponse.json();
-      if (!genResponse.ok) {
-        throw new Error(`OpenAI API error: ${genJson?.error?.message || "Unknown error"}`);
+    // Use Replicate's cartoon transformation model
+    const output = await replicate.run(
+      "tencentarc/photomaker:ddfc2b08d209f9fa8c1eca692712918bd449f695dabb4a958da31802a9570fe4",
+      {
+        input: {
+          image: `data:image/jpeg;base64,${base64Image}`,
+          prompt: CARTOON_PROMPT,
+          negative_prompt: "blurry, low quality, distorted, ugly, bad anatomy, extra limbs, watermark, signature",
+          num_steps: 25,
+          style_strength_ratio: 20,
+          guidance_scale: 5,
+          seed: Math.floor(Math.random() * 1000000),
+        }
       }
-      const b64 = genJson?.data?.[0]?.b64_json;
-      if (!b64) throw new Error("OpenAI generation: missing b64_json");
-      imageBlob = pngBlobFromB64(b64);
+    );
+
+    if (!output || !output[0]) {
+      throw new Error('No image returned from Replicate');
     }
+
+    // Download the generated image
+    const cartoonImageUrl = output[0];
+    const imageResponse = await fetch(cartoonImageUrl);
+    
+    if (!imageResponse.ok) {
+      throw new Error('Failed to download generated image');
+    }
+
+    const imageBlob = await imageResponse.blob();
 
     // Upload to Supabase
     const fileName = `${user.id}/${childId}_avatar_${Date.now()}.png`;
