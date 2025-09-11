@@ -1,165 +1,144 @@
-// deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Replicate from "https://esm.sh/replicate@0.25.2";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const CARTOON_PROMPT = `Transform this photo into a vibrant cartoon character portrait. 
-Create a Pixar-style 2D illustration with:
-- Clean, smooth cartoon features
-- Bright, cheerful colors
-- Simplified facial features while maintaining recognizable characteristics
-- Consistent cartoon styling
-- Child-friendly appearance
-- Symmetrical face positioning
-- Clear, well-defined outlines
-- Professional animation quality
-The result should look like a character from a modern animated movie, suitable for children's storybooks.`;
-
-function pngBlobFromB64(b64: string): Blob {
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return new Blob([bytes], { type: "image/png" });
-}
-
-// safe base64 encoder in chunks (prevents call stack overflow on large files)
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunkSize = 0x8000; // 32KB
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Method not allowed" }), {
-        status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
-
-    // Auth
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    const user = userData?.user;
-
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Inputs
     const formData = await req.formData();
-    const file = formData.get("image") as File | null;
-    const childId = (formData.get("childId") as string | null)?.trim();
+    const image = formData.get('image') as File;
+    const childId = formData.get('childId') as string;
 
-    if (!file || !childId) {
-      return new Response(JSON.stringify({ error: "Image file and childId are required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!image || !childId) {
+      throw new Error('Image and childId are required');
     }
 
-    const replicateApiToken = Deno.env.get("REPLICATE_API_TOKEN") ?? "";
-    if (!replicateApiToken) {
-      return new Response(JSON.stringify({ error: "Missing REPLICATE_API_TOKEN" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    console.log('Processing avatar cartoonification for child:', childId);
+
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not configured');
     }
 
-    const replicate = new Replicate({ auth: replicateApiToken });
+    // Convert image to blob for OpenAI
+    const imageBuffer = await image.arrayBuffer();
+    const imageBlob = new Blob([imageBuffer], { type: image.type });
 
-    // Convert uploaded file to base64 (safe for large files)
-    const arrayBuffer = await file.arrayBuffer();
-    const base64Image = bytesToBase64(new Uint8Array(arrayBuffer));
+    // Get the mask image from Supabase storage
+    const { data: maskData } = await supabase.storage
+      .from('StoryVoyagers')
+      .download('masks/circle_512.png');
 
-    console.log('Processing image for child:', childId);
-    console.log('Calling Replicate API for image transformation...');
+    if (!maskData) {
+      throw new Error('Failed to get mask image');
+    }
 
-    // Use Replicate's cartoon transformation model
-    const output = await replicate.run(
-      "tencentarc/photomaker:ddfc2b08d209f9fa8c1eca692712918bd449f695dabb4a958da31802a9570fe4",
-      {
-        input: {
-          image: `data:image/jpeg;base64,${base64Image}`,
-          prompt: CARTOON_PROMPT,
-          negative_prompt: "blurry, low quality, distorted, ugly, bad anatomy, extra limbs, watermark, signature",
-          num_steps: 25,
-          style_strength_ratio: 20,
-          guidance_scale: 5,
-          seed: Math.floor(Math.random() * 1000000),
-        }
+    console.log('Starting OpenAI DALL-E inpainting...');
+
+    // Create FormData for OpenAI DALL-E edit request
+    const openaiFormData = new FormData();
+    openaiFormData.append('image', imageBlob);
+    openaiFormData.append('mask', maskData);
+    openaiFormData.append('prompt', 'A front-facing portrait of a child as a cartoon character, Pixar-style, light background, 2D illustration, symmetrical face, no background clutter, colorful, friendly expression');
+    openaiFormData.append('n', '1');
+    openaiFormData.append('size', '1024x1024');
+    openaiFormData.append('response_format', 'url');
+
+    const openaiResponse = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+      },
+      body: openaiFormData,
+    });
+
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      console.error('OpenAI API error:', errorText);
+      
+      // Handle quota exceeded errors gracefully
+      if (openaiResponse.status === 429) {
+        throw new Error('OpenAI API quota exceeded. Please try again later.');
       }
-    );
-
-    if (!output || !output[0]) {
-      throw new Error('No image returned from Replicate');
+      
+      throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
     }
 
+    const openaiResult = await openaiResponse.json();
+    const generatedImageUrl = openaiResult.data?.[0]?.url;
+
+    if (!generatedImageUrl) {
+      throw new Error('No cartoon avatar generated by OpenAI');
+    }
+
+    console.log('Avatar generated, downloading...');
+    
     // Download the generated image
-    const cartoonImageUrl = output[0];
-    const imageResponse = await fetch(cartoonImageUrl);
+    const imageResponse = await fetch(generatedImageUrl);
     
     if (!imageResponse.ok) {
-      throw new Error('Failed to download generated image');
+      throw new Error('Failed to download generated avatar');
     }
 
-    const imageBlob = await imageResponse.blob();
+    const downloadedImageBlob = await imageResponse.blob();
 
-    // Upload to Supabase
-    const fileName = `${user.id}/${childId}_avatar_${Date.now()}.png`;
+    // Upload to Supabase Storage
+    const fileName = `${childId}.png`;
     const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(fileName, imageBlob, { contentType: "image/png", upsert: true });
+      .from('avatars')
+      .upload(fileName, downloadedImageBlob, {
+        contentType: 'image/png',
+        upsert: true
+      });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      throw uploadError;
+    }
 
-    const { data: publicUrlData } = await supabase.storage.from("avatars").getPublicUrl(fileName);
-    const avatarUrl = publicUrlData.publicUrl;
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName);
 
-    // Update child profile
+    console.log('Avatar uploaded successfully:', publicUrl);
+
+    // Update child's avatar_url
     const { error: updateError } = await supabase
-      .from("children")
-      .update({ avatar_url: avatarUrl })
-      .eq("id", childId)
-      .eq("user_id", user.id);
+      .from('children')
+      .update({ avatar_url: publicUrl })
+      .eq('id', childId);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      throw updateError;
+    }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        avatarUrl,
-        message: "Photo cartoonified successfully!",
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  } catch (error: any) {
-    console.error("Error:", error);
-    return new Response(JSON.stringify({ error: error?.message || "Internal error" }), {
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Avatar cartoonified successfully!',
+      avatar_url: publicUrl
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Error in cartoonify-avatar:', error);
+    return new Response(JSON.stringify({
+      error: (error as Error).message
+    }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });

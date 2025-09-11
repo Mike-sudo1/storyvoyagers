@@ -70,6 +70,23 @@ serve(async (req) => {
           );
         }
 
+        // Check if user already has 5 children (limit)
+        const { data: existingChildren, error: countError } = await supabase
+          .from('children')
+          .select('id')
+          .eq('user_id', user.id);
+
+        if (countError) {
+          throw countError;
+        }
+
+        if (existingChildren && existingChildren.length >= 5) {
+          return new Response(
+            JSON.stringify({ error: 'You\'ve reached the maximum of 5 profiles. Delete one to add another.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         const { data: newChild, error: createError } = await supabase
           .from('children')
           .insert({

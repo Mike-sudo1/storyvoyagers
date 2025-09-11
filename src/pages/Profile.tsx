@@ -182,12 +182,30 @@ const Profile = () => {
 
             <TabsContent value="children" className="space-y-8">
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-fredoka font-bold">Child Profiles</h2>
-                <Button variant="hero" onClick={handleAddChild}>
+                <div>
+                  <h2 className="text-2xl font-fredoka font-bold">Child Profiles</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {children.length}/5 profiles created
+                  </p>
+                </div>
+                <Button 
+                  variant="hero" 
+                  onClick={handleAddChild}
+                  disabled={children.length >= 5}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Child Profile
                 </Button>
               </div>
+              
+              {children.length >= 5 && (
+                <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
+                  <p className="text-sm text-warning">
+                    <strong>Profile limit reached:</strong> You've created the maximum of 5 child profiles. 
+                    Delete a profile to add a new one.
+                  </p>
+                </div>
+              )}
 
               <div className="grid md:grid-cols-3 gap-6">
                 {children.map((child: any) => (

@@ -109,6 +109,15 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
   }, [open, child, isEditing]);
 
   React.useEffect(() => {
+    if (createChildMutation.isError) {
+      // Check if error is about profile limit
+      const errorMessage = createChildMutation.error?.message;
+      if (errorMessage?.includes('maximum of 5 profiles')) {
+        // Stay on form step to show error
+        return;
+      }
+    }
+
     if (createChildMutation.isSuccess && !isEditing) {
       // Move to photo step after successful child creation
       const childData = createChildMutation.data?.child;
@@ -123,7 +132,7 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
     } else if (updateChildMutation.isSuccess || (createChildMutation.isSuccess && isEditing)) {
       handleSuccess();
     }
-  }, [createChildMutation.isSuccess, updateChildMutation.isSuccess, isEditing, createChildMutation.data]);
+  }, [createChildMutation.isSuccess, createChildMutation.isError, createChildMutation.error, updateChildMutation.isSuccess, isEditing, createChildMutation.data]);
 
   React.useEffect(() => {
     if (cartoonifyMutation.isSuccess) {
@@ -272,21 +281,21 @@ const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: Chil
             )}
           </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                className="flex-1"
-                disabled={createChildMutation.isPending || updateChildMutation.isPending}
-              >
-                {createChildMutation.isPending || updateChildMutation.isPending ? 
-                  "Saving..." : 
-                  isEditing ? "Update Profile" : "Create Profile"
-                }
-              </Button>
-            </div>
+          <div className="flex gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              className="flex-1"
+              disabled={createChildMutation.isPending || updateChildMutation.isPending}
+            >
+              {createChildMutation.isPending || updateChildMutation.isPending ? 
+                "Saving..." : 
+                isEditing ? "Update Profile" : "Create Profile"
+              }
+            </Button>
+          </div>
           </form>
         ) : (
           <div className="space-y-4">
