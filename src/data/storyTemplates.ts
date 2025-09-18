@@ -1,0 +1,151 @@
+export interface StoryTemplate {
+  id: string;
+  title: string;
+  subject: string;
+  description: string;
+  age_min: number;
+  age_max: number;
+  pages: string[];
+}
+
+export const storyTemplates: StoryTemplate[] = [
+  {
+    id: "moon-landing",
+    title: "The Great Moon Adventure",
+    subject: "science",
+    description: "Join a brave astronaut on an incredible journey to the moon and discover the wonders of space exploration.",
+    age_min: 5,
+    age_max: 8,
+    pages: [
+      "Once upon a time, there was a brave young astronaut who dreamed of visiting the moon.",
+      "They put on their special space suit with a shiny helmet and colorful patches.",
+      "The rocket ship stood tall on the launch pad, ready for the amazing journey ahead.",
+      "With a loud roar and bright flames, the rocket blasted off into the sky!",
+      "Up, up, up they flew, leaving Earth behind and soaring through the clouds.",
+      "Soon they were floating in space, surrounded by twinkling stars and planets.",
+      "The moon grew bigger and bigger as they approached its gray, rocky surface.",
+      "They carefully landed their spacecraft on the moon with a gentle thump.",
+      "Stepping outside, they felt so light they could bounce like a kangaroo!",
+      "The Earth looked like a beautiful blue marble floating in the dark sky.",
+      "They planted a colorful flag and collected some moon rocks as souvenirs.",
+      "Walking on the moon felt like being in a magical, silent world.",
+      "They discovered strange craters and mountains all around them.",
+      "Taking pictures to show their friends back home was so exciting!",
+      "They met a friendly moon creature who showed them around.",
+      "Together they explored mysterious caves filled with sparkling crystals.",
+      "The moon creature taught them how to do amazing space somersaults.",
+      "They shared space snacks and became the best of friends.",
+      "As night fell, the stars seemed even brighter from the moon.",
+      "They watched meteors streak across the sky like fireworks.",
+      "The moon creature gave them a special moon crystal as a gift.",
+      "It was time to say goodbye and return to their rocket ship.",
+      "They waved farewell to their new friend and promised to return.",
+      "The journey back to Earth was filled with happy memories.",
+      "They splashed down safely in the ocean, right on target!",
+      "Scientists and friends welcomed them back with cheers and applause.",
+      "They showed everyone the amazing moon rocks they had collected.",
+      "The moon crystal glowed softly, reminding them of their adventure.",
+      "They gave a special presentation about life on the moon.",
+      "Everyone was amazed by the photos and stories they shared.",
+      "They realized that dreams really can come true with determination.",
+      "The brave astronaut became famous for their incredible moon mission.",
+      "Children everywhere were inspired to become astronauts too.",
+      "And whenever they looked up at the moon, they smiled and waved.",
+      "The end of one adventure was just the beginning of many more to come!"
+    ]
+  },
+  {
+    id: "ancient-egypt",
+    title: "Secrets of Ancient Egypt",
+    subject: "history",
+    description: "Travel back in time to ancient Egypt and uncover the mysteries of pharaohs, pyramids, and hieroglyphs.",
+    age_min: 6,
+    age_max: 9,
+    pages: [
+      "Long ago, in the land of ancient Egypt, lived a curious young explorer.",
+      "They discovered a magical golden compass that could travel through time.",
+      "With a bright flash of light, they were transported to ancient Egypt!",
+      "The mighty Nile River flowed through the desert like a ribbon of life.",
+      "Tall palm trees swayed in the warm breeze along the riverbank.",
+      "In the distance, the great pyramids reached up toward the sky.",
+      "Egyptian children played with toys and games by the river's edge.",
+      "They wore simple tunics and had beautiful jewelry made of gold.",
+      "The young explorer learned to write their name in hieroglyphs.",
+      "Each picture symbol told a story or represented a sound.",
+      "They met a kind Egyptian scribe who taught them about papyrus.",
+      "Made from river reeds, papyrus was like the paper of ancient times.",
+      "The pharaoh's palace was filled with colorful paintings and treasures.",
+      "Guards with spears and shields protected the royal family.",
+      "They learned about mummification and how Egyptians honored their dead.",
+      "The process helped preserve people for their journey to the afterlife.",
+      "Inside the pyramids were secret chambers and hidden passages.",
+      "Beautiful paintings covered the walls, telling stories of the pharaohs.",
+      "They discovered that thousands of workers built these amazing monuments.",
+      "Ramps and sledges helped move the heavy stone blocks into place.",
+      "Egyptian farmers grew wheat and barley in the fertile Nile valley.",
+      "When the river flooded each year, it brought rich soil to the fields.",
+      "They watched craftsmen make pottery, jewelry, and beautiful furniture.",
+      "Egyptian doctors knew how to heal people with herbs and medicine.",
+      "The explorer learned about Egyptian gods like Ra, the sun god.",
+      "Temples were built to honor the gods and conduct religious ceremonies.",
+      "Egyptian cats were considered sacred and were treated like royalty.",
+      "They saw how Egyptians used the stars to navigate and tell time.",
+      "Markets bustled with traders selling spices, gold, and precious stones.",
+      "The explorer helped solve a mystery about a missing pharaoh's treasure.",
+      "Using their knowledge of hieroglyphs, they decoded an ancient map.",
+      "The treasure was hidden in a secret room beneath the sphinx.",
+      "They returned the treasure to the museum where it belonged.",
+      "As the sun set over the pyramids, it was time to return home.",
+      "With another flash of light, they were back in their own time, with memories of ancient Egypt forever in their heart."
+    ]
+  },
+  {
+    id: "discovery-america",
+    title: "The Discovery of America",
+    subject: "history", 
+    description: "Sail across the ocean with brave explorers and witness the historic discovery of the New World.",
+    age_min: 7,
+    age_max: 10,
+    pages: [
+      "In 1492, a brave explorer named Christopher Columbus had a big dream.",
+      "He believed he could reach Asia by sailing west across the Atlantic Ocean.",
+      "A young adventurer joined his crew, excited for the journey ahead.",
+      "They prepared three ships: the Niña, the Pinta, and the Santa María.",
+      "The ships were loaded with food, water, and supplies for the long voyage.",
+      "Sailors from Spain volunteered to join this dangerous but exciting mission.",
+      "On August 3rd, they set sail from Spain into the vast, unknown ocean.",
+      "The first few days were filled with excitement and high hopes.",
+      "Day after day, they saw nothing but endless blue water in every direction.",
+      "Some sailors began to worry - they had never been so far from land.",
+      "Columbus used a compass and the stars to guide their way west.",
+      "Dolphins swam alongside the ships, bringing joy to the worried crew.",
+      "They saw flying fish leap from wave to wave like ocean birds.",
+      "Storms tested their courage as giant waves rocked the ships.",
+      "The young adventurer helped tie down the sails during rough weather.",
+      "After many weeks, some sailors wanted to turn back to Spain.",
+      "Columbus convinced them to continue just a few more days.",
+      "On October 12th, a sailor shouted 'Land! Land ahead!'",
+      "Everyone rushed to see a beautiful island with white sandy beaches.",
+      "Palm trees swayed in the tropical breeze as they approached.",
+      "They had reached what we now know as the Bahamas in America!",
+      "Native Taíno people lived on the island and welcomed the visitors.",
+      "The Taíno taught them about new foods like corn, potatoes, and chocolate.",
+      "They showed the explorers how to make hammocks for comfortable sleeping.",
+      "The island had colorful birds, tropical fruits, and crystal-clear water.",
+      "Columbus thought he had reached the Indies, so he called them 'Indians.'",
+      "They explored several more islands, each more beautiful than the last.",
+      "The young adventurer collected shells, feathers, and tropical seeds.",
+      "They met more native people who shared their knowledge and culture.",
+      "After months of exploration, it was time to return to Spain.",
+      "The journey home was faster with favorable winds filling their sails.",
+      "Back in Spain, everyone was amazed by the stories and treasures.",
+      "This voyage opened up a whole new world for exploration and discovery.",
+      "The young adventurer became a famous explorer in their own right.",
+      "And this historic journey changed the course of world history forever."
+    ]
+  }
+];
+
+export const getStoryTemplate = (id: string): StoryTemplate | undefined => {
+  return storyTemplates.find(template => template.id === id);
+};

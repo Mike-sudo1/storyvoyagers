@@ -1,374 +1,206 @@
-import React, { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { useCreateChild, useUpdateChild, useCartoonifyAvatar } from "@/hooks/useChildren";
-import { X, Upload, Camera } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCreateChild, useCartoonifyAvatar } from "@/hooks/useChildren";
+import { toast } from "sonner";
+import { Upload, Loader2, X } from "lucide-react";
 
 interface ChildProfileFormProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  child?: any;
-  isEditing?: boolean;
+  onClose: () => void;
+  existingChildrenCount: number;
 }
 
-const ChildProfileForm = ({ open, onOpenChange, child, isEditing = false }: ChildProfileFormProps) => {
-  const [formData, setFormData] = useState({
-    name: child?.name || "",
-    age: child?.age || "",
-    grade: child?.grade || "",
-    reading_level: child?.reading_level || "",
-    language_preference: child?.language_preference || "en",
-    interests: child?.interests || []
-  });
-
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>("");
-  const [step, setStep] = useState<'form' | 'photo'>('form');
-  const [createdChildId, setCreatedChildId] = useState<string>("");
+const ChildProfileForm = ({ onClose, existingChildrenCount }: ChildProfileFormProps) => {
+  const [name, setName] = useState("");
+  const [age, setAge] = useState<number>(6);
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const createChildMutation = useCreateChild();
-  const updateChildMutation = useUpdateChild();
-  const cartoonifyMutation = useCartoonifyAvatar();
+  const createChild = useCreateChild();
+  const cartoonifyAvatar = useCartoonifyAvatar();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const submitData = {
-      ...formData,
-      age: parseInt(formData.age)
-    };
-
-    if (isEditing && child) {
-      updateChildMutation.mutate({
-        childId: child.id,
-        ...submitData
-      });
-    } else {
-      createChildMutation.mutate(submitData);
-    }
-  };
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setSelectedImage(file);
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
+      setProfileImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleCartoonify = () => {
-    if (selectedImage && createdChildId) {
-      console.log('Starting cartoonify process for child:', createdChildId);
-      cartoonifyMutation.mutate({
-        childId: createdChildId,
-        imageFile: selectedImage
+  const removeImage = () => {
+    setProfileImage(null);
+    setImagePreview("");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (existingChildrenCount >= 5) {
+      toast.error("You can only create up to 5 child profiles");
+      return;
+    }
+
+    if (!name.trim()) {
+      toast.error("Please enter a name");
+      return;
+    }
+
+    if (!profileImage) {
+      toast.error("Please upload a profile photo");
+      return;
+    }
+
+    try {
+      // First create the child profile
+      const childData = await createChild.mutateAsync({
+        name: name.trim(),
+        age,
+        pronouns: "they",
+        grade: `grade-${Math.max(1, age - 4)}`,
+        reading_level: "beginner",
+        interests: [],
+        language_preference: "en"
       });
-    } else {
-      console.error('Missing image or child ID', { selectedImage: !!selectedImage, createdChildId });
-    }
-  };
 
-  const handleSkipPhoto = () => {
-    handleSuccess();
-  };
+      if (childData.success && childData.child) {
+        // Then cartoonify the avatar
+        await cartoonifyAvatar.mutateAsync({
+          childId: childData.child.id,
+          imageFile: profileImage
+        });
 
-  const handleSuccess = () => {
-    onOpenChange(false);
-    setFormData({
-      name: "",
-      age: "",
-      grade: "",
-      reading_level: "",
-      language_preference: "en",
-      interests: []
-    });
-    setSelectedImage(null);
-    setPreviewUrl("");
-    setStep('form');
-    setCreatedChildId("");
-  };
-
-  // Reset form when dialog opens/closes
-  React.useEffect(() => {
-    if (open && child && isEditing) {
-      setFormData({
-        name: child.name || "",
-        age: child.age?.toString() || "",
-        grade: child.grade || "",
-        reading_level: child.reading_level || "",
-        language_preference: child.language_preference || "en",
-        interests: child.interests || []
-      });
-    }
-  }, [open, child, isEditing]);
-
-  React.useEffect(() => {
-    if (createChildMutation.isError) {
-      // Check if error is about profile limit
-      const errorMessage = createChildMutation.error?.message;
-      if (errorMessage?.includes('maximum of 5 profiles')) {
-        // Stay on form step to show error
-        return;
+        toast.success("Child profile created and avatar generated!");
+        onClose();
       }
+    } catch (error) {
+      console.error("Error creating child profile:", error);
+      toast.error("Failed to create child profile");
     }
-
-    if (createChildMutation.isSuccess && !isEditing) {
-      // Move to photo step after successful child creation
-      const childData = createChildMutation.data?.child;
-      console.log('Child created successfully:', childData);
-      if (childData?.id) {
-        setCreatedChildId(childData.id);
-        setStep('photo');
-      } else {
-        console.error('No child ID returned');
-        handleSuccess(); // Fallback: close form if no ID
-      }
-    } else if (updateChildMutation.isSuccess || (createChildMutation.isSuccess && isEditing)) {
-      handleSuccess();
-    }
-  }, [createChildMutation.isSuccess, createChildMutation.isError, createChildMutation.error, updateChildMutation.isSuccess, isEditing, createChildMutation.data]);
-
-  React.useEffect(() => {
-    if (cartoonifyMutation.isSuccess) {
-      handleSuccess();
-    }
-  }, [cartoonifyMutation.isSuccess]);
-
-
-  const removeInterest = (interest: string) => {
-    setFormData(prev => ({
-      ...prev,
-      interests: prev.interests.filter(i => i !== interest)
-    }));
   };
+
+  const isLoading = createChild.isPending || cartoonifyAvatar.isPending;
+
+  if (existingChildrenCount >= 5) {
+    return (
+      <Card className="max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle className="text-center">Profile Limit Reached</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center space-y-4">
+          <p className="text-muted-foreground">
+            You can only create up to 5 child profiles per account.
+          </p>
+          <Button onClick={onClose} variant="outline">
+            Close
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="font-fredoka">
-            {step === 'photo' ? "Add Profile Picture" : (isEditing ? "Edit Child Profile" : "Add New Child")}
-          </DialogTitle>
-          <DialogDescription>
-            {step === 'photo' 
-              ? "Upload a photo to create a cartoon avatar for your child"
-              : (isEditing ? "Update your child's information" : "Create a new child profile for personalized stories")
-            }
-          </DialogDescription>
-        </DialogHeader>
-        
-        {step === 'form' ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name *</Label>
+    <Card className="max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle className="text-center">Create Child Profile</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="name">Name</Label>
             <Input
               id="name"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Child's name"
-              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter child's name"
+              disabled={isLoading}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="age">Age *</Label>
+          <div>
+            <Label htmlFor="age">Age</Label>
             <Input
               id="age"
               type="number"
               min="3"
               max="12"
-              value={formData.age}
-              onChange={(e) => setFormData(prev => ({ ...prev, age: e.target.value }))}
-              placeholder="5"
-              required
+              value={age}
+              onChange={(e) => setAge(parseInt(e.target.value) || 6)}
+              disabled={isLoading}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Grade</Label>
-              <Select value={formData.grade} onValueChange={(value) => setFormData(prev => ({ ...prev, grade: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select grade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pre-k">Pre-K</SelectItem>
-                  <SelectItem value="kindergarten">Kindergarten</SelectItem>
-                  <SelectItem value="1st">1st Grade</SelectItem>
-                  <SelectItem value="2nd">2nd Grade</SelectItem>
-                  <SelectItem value="3rd">3rd Grade</SelectItem>
-                  <SelectItem value="4th">4th Grade</SelectItem>
-                  <SelectItem value="5th">5th Grade</SelectItem>
-                  <SelectItem value="6th">6th Grade</SelectItem>
-                </SelectContent>
-              </Select>
+          <div>
+            <Label>Profile Photo</Label>
+            <div className="mt-2">
+              {imagePreview ? (
+                <div className="relative inline-block">
+                  <img
+                    src={imagePreview}
+                    alt="Profile preview"
+                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                    disabled={isLoading}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-gray-300 rounded-full cursor-pointer hover:border-gray-400">
+                  <Upload className="w-6 h-6 text-gray-400" />
+                  <span className="text-xs text-gray-500 mt-1">Upload</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                    disabled={isLoading}
+                  />
+                </label>
+              )}
             </div>
-
-            <div className="space-y-2">
-              <Label>Reading Level</Label>
-              <Select value={formData.reading_level} onValueChange={(value) => setFormData(prev => ({ ...prev, reading_level: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A">A - Beginning</SelectItem>
-                  <SelectItem value="B">B - Early</SelectItem>
-                  <SelectItem value="C">C - Developing</SelectItem>
-                  <SelectItem value="D">D - Fluent</SelectItem>
-                  <SelectItem value="E">E - Advanced</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Language Preference</Label>
-            <Select value={formData.language_preference} onValueChange={(value) => setFormData(prev => ({ ...prev, language_preference: value }))}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="es">Spanish</SelectItem>
-                <SelectItem value="bilingual">Bilingual</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Interests</Label>
-            <Select onValueChange={(value) => {
-              if (!formData.interests.includes(value)) {
-                setFormData(prev => ({
-                  ...prev,
-                  interests: [...prev.interests, value]
-                }));
-              }
-            }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Add interests" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="space">Space & Astronomy</SelectItem>
-                <SelectItem value="dinosaurs">Dinosaurs</SelectItem>
-                <SelectItem value="animals">Animals</SelectItem>
-                <SelectItem value="science">Science Experiments</SelectItem>
-                <SelectItem value="history">History</SelectItem>
-                <SelectItem value="math">Mathematics</SelectItem>
-                <SelectItem value="art">Art & Creativity</SelectItem>
-                <SelectItem value="sports">Sports</SelectItem>
-                <SelectItem value="music">Music</SelectItem>
-                <SelectItem value="cooking">Cooking</SelectItem>
-                <SelectItem value="nature">Nature</SelectItem>
-                <SelectItem value="adventure">Adventure Stories</SelectItem>
-              </SelectContent>
-            </Select>
-            {formData.interests.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {formData.interests.map((interest, index) => (
-                  <Badge key={index} variant="outline" className="cursor-pointer" onClick={() => removeInterest(interest)}>
-                    {interest}
-                    <X className="h-3 w-3 ml-1" />
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <p className="text-xs text-muted-foreground mt-1">
+              This photo will be converted into a cartoon avatar for stories
+            </p>
           </div>
 
           <div className="flex gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isLoading}
+              className="flex-1"
+            >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
+              disabled={isLoading}
               className="flex-1"
-              disabled={createChildMutation.isPending || updateChildMutation.isPending}
             >
-              {createChildMutation.isPending || updateChildMutation.isPending ? 
-                "Saving..." : 
-                isEditing ? "Update Profile" : "Create Profile"
-              }
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {cartoonifyAvatar.isPending ? "Creating Avatar..." : "Creating..."}
+                </>
+              ) : (
+                "Create Profile"
+              )}
             </Button>
           </div>
-          </form>
-        ) : (
-          <div className="space-y-4">
-            <div className="text-center">
-              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-                {previewUrl ? (
-                  <div className="space-y-4">
-                    <img 
-                      src={previewUrl} 
-                      alt="Selected photo" 
-                      className="mx-auto max-w-full max-h-48 rounded-lg object-cover"
-                    />
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full"
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      Choose Different Photo
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <div>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full"
-                      >
-                        <Camera className="h-4 w-4 mr-2" />
-                        Upload Photo
-                      </Button>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Choose a clear, well-lit photo for best results
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-              />
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleSkipPhoto} 
-                className="flex-1"
-              >
-                Skip Photo
-              </Button>
-              <Button 
-                onClick={handleCartoonify}
-                disabled={!selectedImage || cartoonifyMutation.isPending}
-                className="flex-1"
-              >
-                {cartoonifyMutation.isPending ? "Creating Avatar..." : "Create Avatar"}
-              </Button>
-            </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
 

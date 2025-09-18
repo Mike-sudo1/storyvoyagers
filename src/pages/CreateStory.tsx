@@ -3,16 +3,16 @@ import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ChildProfileCard from "@/components/ChildProfileCard";
+import ChildProfileForm from "@/components/ChildProfileForm";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useChildren } from "@/hooks/useChildren";
 import { supabase } from "@/integrations/supabase/client";
+import { storyTemplates } from "@/data/storyTemplates";
 import { 
   Sparkles, 
   Wand2, 
@@ -25,10 +25,11 @@ import {
   Clock,
   Globe,
   Volume2,
-  Loader2
+  Loader2,
+  Plus
 } from "lucide-react";
 
-interface Story {
+interface StoryTemplate {
   id: string;
   title: string;
   subject: string;
@@ -46,42 +47,10 @@ const CreateStory = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [selectedChild, setSelectedChild] = useState<string | null>(null);
-  const [stories, setStories] = useState<Story[]>([]);
-  const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [storySettings, setStorySettings] = useState({
-    tone: "adventurous",
-    length: "medium",
-    readingLevel: "grade-2",
-    language: "english",
-    narration: true,
-    illustrationStyle: "cartoon"
-  });
+  const [showChildForm, setShowChildForm] = useState(false);
+  const [templates] = useState<StoryTemplate[]>(storyTemplates);
 
-  useEffect(() => {
-    fetchStories();
-  }, []);
-
-  const fetchStories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('stories')
-        .select('id, title, subject, description, age_min, age_max')
-        .order('title');
-
-      if (error) throw error;
-      setStories(data || []);
-    } catch (error) {
-      console.error('Error fetching stories:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load stories",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, 4));
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
@@ -89,20 +58,47 @@ const CreateStory = () => {
   const createStory = async () => {
     if (!selectedTemplate || !selectedChild) return;
 
+    const selectedChildData = children.find(c => c.id === selectedChild);
+    if (!selectedChildData?.avatar_url) {
+      toast({
+        title: "Avatar Required",
+        description: "Please ensure your child has a cartoon avatar before creating a story.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCreating(true);
     try {
-      // Navigate to story reader page
-      navigate(`/story/${selectedTemplate}`);
+      console.log('Starting story generation...');
       
-      toast({
-        title: "Story Ready!",
-        description: "Your personalized story is ready to generate illustrations.",
+      const { data, error } = await supabase.functions.invoke('generate-illustrated-story', {
+        body: {
+          template_id: selectedTemplate,
+          child_id: selectedChild
+        }
       });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to create story');
+      }
+
+      if (data.success && data.story_id) {
+        toast({
+          title: "Story Created!",
+          description: `Your personalized story is being generated. This may take a few minutes.`,
+        });
+        
+        // Navigate to the story reader with the new story ID
+        navigate(`/story/${data.story_id}`);
+      } else {
+        throw new Error('Failed to create story');
+      }
     } catch (error) {
       console.error('Error creating story:', error);
       toast({
         title: "Error",
-        description: "Failed to create story",
+        description: error instanceof Error ? error.message : "Failed to create story",
         variant: "destructive",
       });
     } finally {
@@ -135,14 +131,14 @@ const CreateStory = () => {
     );
   }
 
-  if (loading || childrenLoading) {
+  if (childrenLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
         <Header />
         <main className="container mx-auto px-4 py-8">
           <div className="text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-            <p>Loading stories...</p>
+            <p>Loading...</p>
           </div>
         </main>
         <Footer />
@@ -163,25 +159,25 @@ const CreateStory = () => {
             </div>
             
             <div className="grid md:grid-cols-2 gap-6">
-              {stories.map((story) => (
+              {templates.map((template) => (
                 <Card 
-                  key={story.id}
+                  key={template.id}
                   className={`cursor-pointer transition-smooth hover-lift ${
-                    selectedTemplate === story.id 
+                    selectedTemplate === template.id 
                       ? 'ring-2 ring-primary shadow-card' 
                       : 'shadow-soft'
                   }`}
-                  onClick={() => setSelectedTemplate(story.id)}
+                  onClick={() => setSelectedTemplate(template.id)}
                 >
                   <CardContent className="p-6">
                     <div className="text-center space-y-4">
-                      <div className="text-6xl">{getStoryEmoji(story.subject)}</div>
+                      <div className="text-6xl">{getStoryEmoji(template.subject)}</div>
                       <div className="space-y-2">
                         <Badge className="bg-gradient-cosmic text-white border-0 font-fredoka">
-                          {story.subject}
+                          {template.subject}
                         </Badge>
-                        <h3 className="font-fredoka font-semibold text-xl">{story.title}</h3>
-                        <p className="text-muted-foreground text-sm">{story.description}</p>
+                        <h3 className="font-fredoka font-semibold text-xl">{template.title}</h3>
+                        <p className="text-muted-foreground text-sm">{template.description}</p>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
@@ -191,7 +187,7 @@ const CreateStory = () => {
                         </div>
                         <div className="flex items-center space-x-1">
                           <User className="h-3 w-3" />
-                          <span>Ages {story.age_min}-{story.age_max}</span>
+                          <span>Ages {template.age_min}-{template.age_max}</span>
                         </div>
                       </div>
                     </div>
@@ -230,7 +226,20 @@ const CreateStory = () => {
                   />
                 </div>
               ))}
-              {children.length < 5 && <ChildProfileCard isNew={true} />}
+              {children.length < 5 && (
+                <Card 
+                  className="cursor-pointer transition-smooth hover-lift shadow-soft border-dashed border-2"
+                  onClick={() => setShowChildForm(true)}
+                >
+                  <CardContent className="p-6 flex flex-col items-center justify-center h-full min-h-[200px]">
+                    <Plus className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="font-fredoka font-semibold text-lg mb-2">Add New Child</h3>
+                    <p className="text-muted-foreground text-sm text-center">
+                      Create a new profile to personalize stories
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         );
@@ -239,159 +248,9 @@ const CreateStory = () => {
         return (
           <div className="space-y-6">
             <div className="text-center space-y-4">
-              <h2 className="text-3xl font-fredoka font-bold">Customize Your Story</h2>
+              <h2 className="text-3xl font-fredoka font-bold">Ready to Create!</h2>
               <p className="text-muted-foreground">
-                Adjust the settings to create the perfect learning experience.
-              </p>
-            </div>
-            
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              <Card className="bg-gradient-card border-0 shadow-soft">
-                <CardHeader>
-                  <CardTitle className="font-fredoka text-lg flex items-center">
-                    <Palette className="h-5 w-5 mr-2" />
-                    Story Style
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium">Tone</Label>
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      {["adventurous", "cozy", "funny"].map((tone) => (
-                        <Button
-                          key={tone}
-                          variant={storySettings.tone === tone ? "hero" : "outline"}
-                          size="sm"
-                          onClick={() => setStorySettings(prev => ({...prev, tone}))}
-                          className="capitalize text-xs"
-                        >
-                          {tone}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium">Length</Label>
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      {[
-                        { id: "short", label: "Short (6-8 pages)" },
-                        { id: "medium", label: "Medium (10-14 pages)" },
-                        { id: "long", label: "Long (16-24 pages)" }
-                      ].map((length) => (
-                        <Button
-                          key={length.id}
-                          variant={storySettings.length === length.id ? "hero" : "outline"}
-                          size="sm"
-                          onClick={() => setStorySettings(prev => ({...prev, length: length.id}))}
-                          className="text-xs h-auto py-2"
-                        >
-                          {length.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium">Illustration Style</Label>
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      {["cartoon", "flat", "hand-drawn"].map((style) => (
-                        <Button
-                          key={style}
-                          variant={storySettings.illustrationStyle === style ? "hero" : "outline"}
-                          size="sm"
-                          onClick={() => setStorySettings(prev => ({...prev, illustrationStyle: style}))}
-                          className="capitalize text-xs"
-                        >
-                          {style}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-card border-0 shadow-soft">
-                <CardHeader>
-                  <CardTitle className="font-fredoka text-lg flex items-center">
-                    <Settings className="h-5 w-5 mr-2" />
-                    Learning Settings
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium">Reading Level</Label>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      {[
-                        { id: "grade-1", label: "Grade 1-2" },
-                        { id: "grade-2", label: "Grade 2-3" },
-                        { id: "grade-3", label: "Grade 3-4" },
-                        { id: "grade-4", label: "Grade 4-5" }
-                      ].map((level) => (
-                        <Button
-                          key={level.id}
-                          variant={storySettings.readingLevel === level.id ? "hero" : "outline"}
-                          size="sm"
-                          onClick={() => setStorySettings(prev => ({...prev, readingLevel: level.id}))}
-                          className="text-xs"
-                        >
-                          {level.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium flex items-center">
-                      <Globe className="h-4 w-4 mr-1" />
-                      Language
-                    </Label>
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      {[
-                        { id: "english", label: "English" },
-                        { id: "spanish", label: "Spanish" },
-                        { id: "bilingual", label: "Bilingual" }
-                      ].map((lang) => (
-                        <Button
-                          key={lang.id}
-                          variant={storySettings.language === lang.id ? "hero" : "outline"}
-                          size="sm"
-                          onClick={() => setStorySettings(prev => ({...prev, language: lang.id}))}
-                          className="text-xs"
-                        >
-                          {lang.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Volume2 className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-medium">Audio Narration</Label>
-                    </div>
-                    <Button
-                      variant={storySettings.narration ? "success" : "outline"}
-                      size="sm"
-                      onClick={() => setStorySettings(prev => ({...prev, narration: !prev.narration}))}
-                      className="text-xs"
-                    >
-                      {storySettings.narration ? "On" : "Off"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-6">
-            <div className="text-center space-y-4">
-              <h2 className="text-3xl font-fredoka font-bold">Story Preview</h2>
-              <p className="text-muted-foreground">
-                Review your personalized story before we create it for you.
+                Review your selection and create your personalized story.
               </p>
             </div>
             
@@ -399,39 +258,39 @@ const CreateStory = () => {
               <CardContent className="p-8 space-y-6">
                 <div className="text-center space-y-4">
                   <div className="text-6xl">
-                    {getStoryEmoji(stories.find(s => s.id === selectedTemplate)?.subject || '')}
+                    {getStoryEmoji(templates.find(t => t.id === selectedTemplate)?.subject || '')}
                   </div>
                   <h3 className="text-2xl font-fredoka font-bold">
-                    {stories.find(s => s.id === selectedTemplate)?.title || ''} with {children.find(c => c.id === selectedChild)?.name || ''}
+                    {templates.find(t => t.id === selectedTemplate)?.title || ''} with {children.find(c => c.id === selectedChild)?.name || ''}
                   </h3>
                   <Badge className="bg-gradient-cosmic text-white border-0 font-fredoka">
-                    {stories.find(s => s.id === selectedTemplate)?.subject || ''}
+                    {templates.find(t => t.id === selectedTemplate)?.subject || ''}
                   </Badge>
                 </div>
 
-                  <div className="space-y-4 text-sm">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="font-medium">Child:</span> {children.find(c => c.id === selectedChild)?.name || ''}
-                      </div>
-                      <div>
-                        <span className="font-medium">Tone:</span> {storySettings.tone}
-                      </div>
-                      <div>
-                        <span className="font-medium">Length:</span> {storySettings.length}
-                      </div>
-                      <div>
-                        <span className="font-medium">Language:</span> {storySettings.language}
-                      </div>
+                <div className="space-y-4 text-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="font-medium">Child:</span> {children.find(c => c.id === selectedChild)?.name || ''}
+                    </div>
+                    <div>
+                      <span className="font-medium">Age:</span> {children.find(c => c.id === selectedChild)?.age || ''} years old
+                    </div>
+                    <div>
+                      <span className="font-medium">Template:</span> {templates.find(t => t.id === selectedTemplate)?.title || ''}
+                    </div>
+                    <div>
+                      <span className="font-medium">Pages:</span> ~35 illustrated pages
                     </div>
                   </div>
+                </div>
 
-                  <div className="border-t pt-4">
-                    <h4 className="font-fredoka font-semibold mb-2">Story Preview:</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      "Get ready for an incredible adventure! {children.find(c => c.id === selectedChild)?.name || ''} is about to embark on a {storySettings.tone} journey through {stories.find(s => s.id === selectedTemplate)?.title?.toLowerCase() || ''}. With their cartoon avatar leading the way, they'll discover amazing facts and have fun learning along the way..."
-                    </p>
-                  </div>
+                <div className="border-t pt-4">
+                  <h4 className="font-fredoka font-semibold mb-2">What happens next:</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    We'll create a personalized 35-page story featuring {children.find(c => c.id === selectedChild)?.name || ''} as the main character. Each page will have a custom illustration generated using your child's cartoon avatar. This process may take a few minutes.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -452,7 +311,7 @@ const CreateStory = () => {
           <div className="max-w-4xl mx-auto">
             {/* Progress Bar */}
             <div className="flex items-center justify-between mb-6">
-              {[1, 2, 3, 4].map((step) => (
+              {[1, 2, 3].map((step) => (
                 <div key={step} className="flex items-center">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-fredoka font-bold text-sm ${
                     currentStep >= step ? 'bg-gradient-cosmic text-white' : 'bg-muted text-muted-foreground'
@@ -538,6 +397,15 @@ const CreateStory = () => {
       </section>
 
       <Footer />
+      
+      <Dialog open={showChildForm} onOpenChange={setShowChildForm}>
+        <DialogContent className="max-w-md">
+          <ChildProfileForm 
+            onClose={() => setShowChildForm(false)}
+            existingChildrenCount={children.length}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
