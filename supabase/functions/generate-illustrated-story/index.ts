@@ -53,16 +53,16 @@ serve(async (req) => {
   try {
     console.log('🚀 === STORY GENERATION START ===');
     
-    const { template_id, child_id } = await req.json();
-    console.log('📝 Request data:', { template_id, child_id });
+    const { template_id, child_id, story_id } = await req.json();
+    console.log('📝 Request data:', { template_id, child_id, story_id });
 
     // Validate required fields
-    if (!template_id || !child_id) {
-      console.error('❌ Missing required fields:', { template_id, child_id });
+    if (!child_id || (!template_id && !story_id)) {
+      console.error('❌ Missing required fields:', { template_id, child_id, story_id });
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Missing template_id or child_id' 
+          error: 'Missing child_id and either template_id or story_id' 
         }), 
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
@@ -71,61 +71,82 @@ serve(async (req) => {
       );
     }
 
-    console.log('🔍 Looking for template in database...');
-    
-    // Try to find template in database first
-    let template = null;
-    const { data: dbTemplate, error: dbError } = await supabase
-      .from('stories')
-      .select('*')
-      .eq('id', template_id)
-      .eq('is_template', true)
-      .single();
+    let template: any = null;
 
-    if (dbTemplate) {
-      console.log('✅ Found template in database:', dbTemplate.title);
-      template = dbTemplate;
-    } else {
-      console.log('🔍 Template not found in DB, checking hardcoded templates...');
-      
-      // Fallback to hardcoded templates
-      const hardcodedTemplate = storyTemplates[template_id];
-      if (hardcodedTemplate) {
-        console.log('✅ Found hardcoded template:', hardcodedTemplate.title);
-        
-        // Create story record from hardcoded template
-        const { data: newStory, error: storyError } = await supabase
-          .from('stories')
-          .insert({
-            title: hardcodedTemplate.title,
-            subject: 'adventure',
-            description: `An exciting adventure story featuring the child as the main character.`,
-            content: hardcodedTemplate.pages.join('\n\n'),
-            is_template: false,
-            age_min: 5,
-            age_max: 10
-          })
-          .select()
-          .single();
+    if (story_id) {
+      console.log('🔍 Using existing story by ID...');
+      const { data: storyRec, error: storyFetchError } = await supabase
+        .from('stories')
+        .select('*')
+        .eq('id', story_id)
+        .single();
 
-        if (storyError) {
-          console.error('❌ Failed to create story:', storyError);
-          throw storyError;
-        }
-
-        template = newStory;
-      } else {
-        console.error('❌ Template not found:', template_id);
+      if (storyFetchError || !storyRec) {
+        console.error('❌ Story not found:', storyFetchError);
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: `Template ${template_id} not found` 
-          }), 
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-            status: 404 
-          }
+          JSON.stringify({ success: false, error: 'Story not found' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
         );
+      }
+
+      template = storyRec;
+      console.log('✅ Using story:', template.title, template.id);
+    } else {
+      console.log('🔍 Looking for template in database...');
+      
+      // Try to find template in database first
+      const { data: dbTemplate, error: dbError } = await supabase
+        .from('stories')
+        .select('*')
+        .eq('id', template_id)
+        .eq('is_template', true)
+        .single();
+
+      if (dbTemplate) {
+        console.log('✅ Found template in database:', dbTemplate.title);
+        template = dbTemplate;
+      } else {
+        console.log('🔍 Template not found in DB, checking hardcoded templates...');
+        
+        // Fallback to hardcoded templates
+        const hardcodedTemplate = storyTemplates[template_id];
+        if (hardcodedTemplate) {
+          console.log('✅ Found hardcoded template:', hardcodedTemplate.title);
+          
+          // Create story record from hardcoded template
+          const { data: newStory, error: storyError } = await supabase
+            .from('stories')
+            .insert({
+              title: hardcodedTemplate.title,
+              subject: 'adventure',
+              description: `An exciting adventure story featuring the child as the main character.`,
+              content: hardcodedTemplate.pages.join('\n\n'),
+              is_template: false,
+              age_min: 5,
+              age_max: 10
+            })
+            .select()
+            .single();
+
+          if (storyError) {
+            console.error('❌ Failed to create story:', storyError);
+            throw storyError;
+          }
+
+          template = newStory;
+        } else {
+          console.error('❌ Template not found:', template_id);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: `Template ${template_id} not found` 
+            }), 
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+              status: 404 
+            }
+          );
+        }
       }
     }
 
@@ -189,7 +210,7 @@ serve(async (req) => {
     const contentParagraphs = personalizedContent.split('\n\n').filter(p => p.trim());
     const pagesPerParagraph = Math.max(1, Math.ceil(contentParagraphs.length / 5));
     
-    const storyPages = [];
+    let storyPages: any[] = [];
     for (let i = 0; i < Math.min(5, contentParagraphs.length); i++) {
       const pageText = contentParagraphs.slice(i * pagesPerParagraph, (i + 1) * pagesPerParagraph).join('\n\n');
       
@@ -219,18 +240,38 @@ serve(async (req) => {
       }
     }
 
-    // Insert story pages into database
-    const { data: insertedPages, error: pagesError } = await supabase
-      .from('story_pages')
-      .insert(storyPages)
-      .select();
+    // If this is an existing story, prefer reusing pages if present
+    if (typeof story_id === 'string' && story_id) {
+      const { data: existingPages, error: existingErr } = await supabase
+        .from('story_pages')
+        .select('*')
+        .eq('story_id', template.id)
+        .order('page_number', { ascending: true });
 
-    if (pagesError) {
-      console.error('❌ Failed to insert story pages:', pagesError);
-      throw pagesError;
+      if (existingErr) {
+        console.error('⚠️ Failed to check existing pages:', existingErr);
+      } else if (existingPages && existingPages.length > 0) {
+        console.log(`ℹ️ Found ${existingPages.length} existing pages, skipping insertion`);
+        storyPages = existingPages;
+      }
     }
 
-    console.log(`✅ Created ${insertedPages.length} story pages`);
+    // Insert story pages into database (only if none existed)
+    if (storyPages.length === 0 || !(typeof story_id === 'string' && story_id)) {
+      const { data: insertedPages, error: pagesError } = await supabase
+        .from('story_pages')
+        .insert(storyPages)
+        .select();
+
+      if (pagesError) {
+        console.error('❌ Failed to insert story pages:', pagesError);
+        throw pagesError;
+      }
+
+      console.log(`✅ Created ${insertedPages?.length || storyPages.length} story pages`);
+    } else {
+      console.log('✅ Using existing story pages');
+    }
 
     // Generate illustrations for each page
     console.log('🎨 Starting image generation...');
