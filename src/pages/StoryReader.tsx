@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
 const StoryReader = () => {
-  const { id } = useParams();
+  const { storyId } = useParams();
   const { user } = useAuth();
   const [story, setStory] = React.useState<any>(null);
   const [children, setChildren] = React.useState<any[]>([]);
@@ -19,14 +19,14 @@ const StoryReader = () => {
 
   React.useEffect(() => {
     const fetchData = async () => {
-      if (!id || !user) return;
+      if (!storyId || !user) return;
 
       try {
         // Fetch story
         const { data: storyData, error: storyError } = await supabase
           .from('stories')
           .select('*')
-          .eq('id', id)
+          .eq('id', storyId)
           .single();
 
         if (storyError) throw storyError;
@@ -54,7 +54,7 @@ const StoryReader = () => {
     };
 
     fetchData();
-  }, [id, user]);
+  }, [storyId, user]);
 
   if (loading) {
     return (
@@ -134,7 +134,7 @@ const StoryReader = () => {
               
               {selectedChild && (
                 <StoryGenerationButton
-                  storyId={id!}
+                  storyId={storyId!}
                   childId={selectedChild}
                 />
               )}
@@ -163,7 +163,7 @@ const StoryReader = () => {
         {/* Story Viewer */}
         {selectedChild && (
           <StoryViewer
-            storyId={id!}
+            storyId={storyId!}
             storyTitle={story.title}
           />
         )}

@@ -67,6 +67,7 @@ const App = () => {
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           
           {/* Public Routes */}
+          <Route path="/read/:storyId" element={<StoryReader />} />
           <Route path="/story/:storyId" element={<StoryReader />} />
           <Route path="/about" element={<PublicRoute><About /></PublicRoute>} />
           <Route path="/signin" element={<PublicRoute><SignIn /></PublicRoute>} />
