@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ChildProfileCard from "@/components/ChildProfileCard";
@@ -8,6 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useChildren } from "@/hooks/useChildren";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Sparkles, 
   Wand2, 
@@ -19,61 +24,31 @@ import {
   Palette,
   Clock,
   Globe,
-  Volume2
+  Volume2,
+  Loader2
 } from "lucide-react";
 
-const storyTemplates = [
-  {
-    id: 1,
-    title: "Moon Landing Adventure",
-    subject: "History",
-    description: "Join Neil Armstrong and Buzz Aldrin on the historic Apollo 11 mission to the moon.",
-    duration: "12-15 min",
-    ageRange: "Ages 6-10",
-    learningObjectives: ["Space exploration", "Historical timeline", "Scientific achievement"],
-    illustration: "🚀"
-  },
-  {
-    id: 2,
-    title: "Water Cycle Journey",
-    subject: "Science", 
-    description: "Follow a water droplet through evaporation, condensation, and precipitation.",
-    duration: "8-10 min",
-    ageRange: "Ages 5-8",
-    learningObjectives: ["Weather patterns", "Scientific processes", "Environmental science"],
-    illustration: "💧"
-  },
-  {
-    id: 3,
-    title: "Egyptian Pyramid Mystery",
-    subject: "History",
-    description: "Explore ancient Egypt and help build the Great Pyramid of Giza.",
-    duration: "15-18 min",
-    ageRange: "Ages 7-11",
-    learningObjectives: ["Ancient civilizations", "Architecture", "Cultural history"],
-    illustration: "🏛️"
-  },
-  {
-    id: 4,
-    title: "Multiplication Adventure",
-    subject: "Math",
-    description: "Run a pizza restaurant and learn multiplication through serving customers.",
-    duration: "10-12 min", 
-    ageRange: "Ages 6-9",
-    learningObjectives: ["Multiplication tables", "Problem solving", "Money math"],
-    illustration: "🍕"
-  }
-];
-
-const sampleChildren = [
-  { name: "Emma", age: 7, avatarUrl: undefined, storiesCompleted: 12, badges: 8 },
-  { name: "Alex", age: 5, avatarUrl: undefined, storiesCompleted: 6, badges: 4 }
-];
+interface Story {
+  id: string;
+  title: string;
+  subject: string;
+  description: string;
+  age_min: number;
+  age_max: number;
+}
 
 const CreateStory = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { data: children = [], isLoading: childrenLoading } = useChildren();
+  
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [selectedChild, setSelectedChild] = useState<string | null>(null);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [storySettings, setStorySettings] = useState({
     tone: "adventurous",
     length: "medium",
@@ -83,8 +58,97 @@ const CreateStory = () => {
     illustrationStyle: "cartoon"
   });
 
+  useEffect(() => {
+    fetchStories();
+  }, []);
+
+  const fetchStories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('stories')
+        .select('id, title, subject, description, age_min, age_max')
+        .order('title');
+
+      if (error) throw error;
+      setStories(data || []);
+    } catch (error) {
+      console.error('Error fetching stories:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load stories",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, 4));
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
+
+  const createStory = async () => {
+    if (!selectedTemplate || !selectedChild) return;
+
+    setCreating(true);
+    try {
+      // Navigate to story reader page
+      navigate(`/story/${selectedTemplate}`);
+      
+      toast({
+        title: "Story Ready!",
+        description: "Your personalized story is ready to generate illustrations.",
+      });
+    } catch (error) {
+      console.error('Error creating story:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create story",
+        variant: "destructive",
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const getStoryEmoji = (subject: string) => {
+    switch (subject.toLowerCase()) {
+      case 'history': return '🏛️';
+      case 'science': return '🔬';
+      case 'math': return '🔢';
+      default: return '📖';
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <Card className="max-w-2xl mx-auto">
+            <CardContent className="text-center py-8">
+              <p>Please sign in to create stories</p>
+            </CardContent>
+          </Card>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (loading || childrenLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+            <p>Loading stories...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -99,45 +163,36 @@ const CreateStory = () => {
             </div>
             
             <div className="grid md:grid-cols-2 gap-6">
-              {storyTemplates.map((template) => (
+              {stories.map((story) => (
                 <Card 
-                  key={template.id}
+                  key={story.id}
                   className={`cursor-pointer transition-smooth hover-lift ${
-                    selectedTemplate === template.id 
+                    selectedTemplate === story.id 
                       ? 'ring-2 ring-primary shadow-card' 
                       : 'shadow-soft'
                   }`}
-                  onClick={() => setSelectedTemplate(template.id)}
+                  onClick={() => setSelectedTemplate(story.id)}
                 >
                   <CardContent className="p-6">
                     <div className="text-center space-y-4">
-                      <div className="text-6xl">{template.illustration}</div>
+                      <div className="text-6xl">{getStoryEmoji(story.subject)}</div>
                       <div className="space-y-2">
                         <Badge className="bg-gradient-cosmic text-white border-0 font-fredoka">
-                          {template.subject}
+                          {story.subject}
                         </Badge>
-                        <h3 className="font-fredoka font-semibold text-xl">{template.title}</h3>
-                        <p className="text-muted-foreground text-sm">{template.description}</p>
+                        <h3 className="font-fredoka font-semibold text-xl">{story.title}</h3>
+                        <p className="text-muted-foreground text-sm">{story.description}</p>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center space-x-1">
                           <Clock className="h-3 w-3" />
-                          <span>{template.duration}</span>
+                          <span>12-15 min</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <User className="h-3 w-3" />
-                          <span>{template.ageRange}</span>
+                          <span>Ages {story.age_min}-{story.age_max}</span>
                         </div>
-                      </div>
-
-                      <div className="text-left">
-                        <h4 className="font-medium text-sm mb-2">Learning Objectives:</h4>
-                        <ul className="text-xs text-muted-foreground space-y-1">
-                          {template.learningObjectives.map((objective, index) => (
-                            <li key={index}>• {objective}</li>
-                          ))}
-                        </ul>
                       </div>
                     </div>
                   </CardContent>
@@ -158,18 +213,24 @@ const CreateStory = () => {
             </div>
             
             <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-              {sampleChildren.map((child, index) => (
+              {children.map((child) => (
                 <div 
-                  key={index}
+                  key={child.id}
                   className={`cursor-pointer transition-smooth ${
-                    selectedChild === child.name ? 'ring-2 ring-primary' : ''
+                    selectedChild === child.id ? 'ring-2 ring-primary' : ''
                   }`}
-                  onClick={() => setSelectedChild(child.name)}
+                  onClick={() => setSelectedChild(child.id)}
                 >
-                  <ChildProfileCard {...child} />
+                  <ChildProfileCard 
+                    name={child.name} 
+                    age={child.age || 0} 
+                    avatarUrl={child.avatar_url} 
+                    storiesCompleted={child.stories_completed || 0} 
+                    badges={child.badges || 0} 
+                  />
                 </div>
               ))}
-              <ChildProfileCard isNew={true} />
+              {children.length < 5 && <ChildProfileCard isNew={true} />}
             </div>
           </div>
         );
@@ -338,39 +399,39 @@ const CreateStory = () => {
               <CardContent className="p-8 space-y-6">
                 <div className="text-center space-y-4">
                   <div className="text-6xl">
-                    {storyTemplates.find(t => t.id === selectedTemplate)?.illustration}
+                    {getStoryEmoji(stories.find(s => s.id === selectedTemplate)?.subject || '')}
                   </div>
                   <h3 className="text-2xl font-fredoka font-bold">
-                    {storyTemplates.find(t => t.id === selectedTemplate)?.title} with {selectedChild}
+                    {stories.find(s => s.id === selectedTemplate)?.title || ''} with {children.find(c => c.id === selectedChild)?.name || ''}
                   </h3>
                   <Badge className="bg-gradient-cosmic text-white border-0 font-fredoka">
-                    {storyTemplates.find(t => t.id === selectedTemplate)?.subject}
+                    {stories.find(s => s.id === selectedTemplate)?.subject || ''}
                   </Badge>
                 </div>
 
-                <div className="space-y-4 text-sm">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="font-medium">Child:</span> {selectedChild}
-                    </div>
-                    <div>
-                      <span className="font-medium">Tone:</span> {storySettings.tone}
-                    </div>
-                    <div>
-                      <span className="font-medium">Length:</span> {storySettings.length}
-                    </div>
-                    <div>
-                      <span className="font-medium">Language:</span> {storySettings.language}
+                  <div className="space-y-4 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="font-medium">Child:</span> {children.find(c => c.id === selectedChild)?.name || ''}
+                      </div>
+                      <div>
+                        <span className="font-medium">Tone:</span> {storySettings.tone}
+                      </div>
+                      <div>
+                        <span className="font-medium">Length:</span> {storySettings.length}
+                      </div>
+                      <div>
+                        <span className="font-medium">Language:</span> {storySettings.language}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="border-t pt-4">
-                  <h4 className="font-fredoka font-semibold mb-2">Story Preview:</h4>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    "Get ready for an incredible adventure! {selectedChild} is about to embark on a {storySettings.tone} journey through {storyTemplates.find(t => t.id === selectedTemplate)?.title.toLowerCase()}. With their cartoon avatar leading the way, they'll discover amazing facts and have fun learning along the way..."
-                  </p>
-                </div>
+                  <div className="border-t pt-4">
+                    <h4 className="font-fredoka font-semibold mb-2">Story Preview:</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      "Get ready for an incredible adventure! {children.find(c => c.id === selectedChild)?.name || ''} is about to embark on a {storySettings.tone} journey through {stories.find(s => s.id === selectedTemplate)?.title?.toLowerCase() || ''}. With their cartoon avatar leading the way, they'll discover amazing facts and have fun learning along the way..."
+                    </p>
+                  </div>
               </CardContent>
             </Card>
           </div>
@@ -457,9 +518,18 @@ const CreateStory = () => {
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               ) : (
-                <Button variant="magic" className="px-8">
-                  <Wand2 className="h-4 w-4 mr-2" />
-                  Create My Story!
+                <Button 
+                  variant="magic" 
+                  className="px-8"
+                  onClick={createStory}
+                  disabled={creating}
+                >
+                  {creating ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-4 w-4 mr-2" />
+                  )}
+                  {creating ? 'Creating...' : 'Create My Story!'}
                 </Button>
               )}
             </div>
