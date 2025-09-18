@@ -41,13 +41,26 @@ const CreateStory = () => {
   const [selectedChild, setSelectedChild] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [showChildForm, setShowChildForm] = useState(false);
+  const [showChildSelector, setShowChildSelector] = useState(false);
   const [templates] = useState<StoryTemplate[]>(storyTemplates);
+
+  const handleCreateStoryClick = () => {
+    if (!selectedTemplate) {
+      toast({
+        title: "No Template Selected",
+        description: "Please select a story template first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowChildSelector(true);
+  };
 
   const createStory = async () => {
     // Validate selections
     if (!selectedTemplate || !selectedChild) {
       toast({
-        title: "Missing Selection",
+        title: "Missing Selection", 
         description: "Please select both a story template and a child profile.",
         variant: "destructive",
       });
@@ -94,7 +107,8 @@ const CreateStory = () => {
           description: `Your personalized story has been generated successfully.`,
         });
         
-        // Navigate to the story reader
+        // Close the child selector and navigate
+        setShowChildSelector(false);
         navigate(`/read/${data.story_id}`);
       } else {
         console.error('❌ Unexpected response format:', data);
@@ -152,7 +166,7 @@ const CreateStory = () => {
     );
   }
 
-  const canProceed = selectedTemplate && selectedChild;
+  const canProceed = selectedTemplate;
 
   return (
     <div className="min-h-screen">
@@ -211,57 +225,93 @@ const CreateStory = () => {
               </div>
             </div>
 
-            {/* Step 2: Child Selection */}
-            <div className="space-y-6">
-              <div className="text-center space-y-4">
-                <h2 className="text-3xl font-fredoka font-bold">Select Child Profile</h2>
-                <p className="text-muted-foreground">
-                  Choose which child will be the hero of this adventure
-                </p>
-              </div>
-              
-              <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                {children.map((child) => (
-                  <div 
-                    key={child.id}
-                    className={`cursor-pointer transition-smooth ${
-                      selectedChild === child.id ? 'ring-2 ring-primary rounded-lg' : ''
-                    }`}
-                    onClick={() => setSelectedChild(child.id)}
-                  >
-                    <ChildProfileCard 
-                      name={child.name} 
-                      age={child.age || 0} 
-                      avatarUrl={child.avatar_url} 
-                      storiesCompleted={child.stories_completed || 0} 
-                      badges={child.badges || 0} 
-                    />
-                  </div>
-                ))}
-                {children.length < 5 && (
-                  <Card 
-                    className="cursor-pointer transition-smooth hover-lift shadow-soft border-dashed border-2"
-                    onClick={() => setShowChildForm(true)}
-                  >
-                    <CardContent className="p-6 flex flex-col items-center justify-center h-full min-h-[200px]">
-                      <Plus className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="font-fredoka font-semibold text-lg mb-2">Add New Child</h3>
-                      <p className="text-muted-foreground text-sm text-center">
-                        Create a new profile to personalize stories
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
 
             {/* Create Story Button */}
             <div className="text-center">
               <Button 
                 variant="hero" 
                 size="lg"
+                onClick={handleCreateStoryClick}
+                disabled={!canProceed}
+                className="px-12 py-6 text-lg"
+              >
+                <Wand2 className="h-5 w-5 mr-2" />
+                Create My Story!
+              </Button>
+              
+              {!canProceed && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Please select a story template to continue
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Footer />
+      
+      {/* Child Form Dialog */}
+      <Dialog open={showChildForm} onOpenChange={setShowChildForm}>
+        <DialogContent className="max-w-md">
+          <ChildProfileForm 
+            onClose={() => setShowChildForm(false)}
+            existingChildrenCount={children.length}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Child Selection Dialog */}
+      <Dialog open={showChildSelector} onOpenChange={setShowChildSelector}>
+        <DialogContent className="max-w-4xl">
+          <div className="space-y-6">
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl font-fredoka font-bold">Select Child Profile</h2>
+              <p className="text-muted-foreground">
+                Choose which child will be the hero of this adventure
+              </p>
+            </div>
+            
+            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+              {children.map((child) => (
+                <div 
+                  key={child.id}
+                  className={`cursor-pointer transition-smooth ${
+                    selectedChild === child.id ? 'ring-2 ring-primary rounded-lg' : ''
+                  }`}
+                  onClick={() => setSelectedChild(child.id)}
+                >
+                  <ChildProfileCard 
+                    name={child.name} 
+                    age={child.age || 0} 
+                    avatarUrl={child.avatar_url} 
+                    storiesCompleted={child.stories_completed || 0} 
+                    badges={child.badges || 0} 
+                  />
+                </div>
+              ))}
+              {children.length < 5 && (
+                <Card 
+                  className="cursor-pointer transition-smooth hover-lift shadow-soft border-dashed border-2"
+                  onClick={() => setShowChildForm(true)}
+                >
+                  <CardContent className="p-6 flex flex-col items-center justify-center h-full min-h-[200px]">
+                    <Plus className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="font-fredoka font-semibold text-lg mb-2">Add New Child</h3>
+                    <p className="text-muted-foreground text-sm text-center">
+                      Create a new profile to personalize stories
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <div className="text-center">
+              <Button 
+                variant="hero" 
+                size="lg"
                 onClick={createStory}
-                disabled={creating || !canProceed}
+                disabled={creating || !selectedChild}
                 className="px-12 py-6 text-lg"
               >
                 {creating ? (
@@ -277,24 +327,13 @@ const CreateStory = () => {
                 )}
               </Button>
               
-              {!canProceed && (
+              {!selectedChild && (
                 <p className="text-sm text-muted-foreground mt-2">
-                  Please select both a story template and child profile to continue
+                  Please select a child profile to continue
                 </p>
               )}
             </div>
           </div>
-        </div>
-      </section>
-
-      <Footer />
-      
-      <Dialog open={showChildForm} onOpenChange={setShowChildForm}>
-        <DialogContent className="max-w-md">
-          <ChildProfileForm 
-            onClose={() => setShowChildForm(false)}
-            existingChildrenCount={children.length}
-          />
         </DialogContent>
       </Dialog>
     </div>
