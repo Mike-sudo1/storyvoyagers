@@ -70,7 +70,12 @@ const CreateStory = () => {
 
     setCreating(true);
     try {
-      console.log('Starting story generation...');
+      console.log('🚀 Starting story creation...', {
+        template_id: selectedTemplate,
+        child_id: selectedChild,
+        child_name: selectedChildData.name,
+        avatar_url: selectedChildData.avatar_url
+      });
       
       const { data, error } = await supabase.functions.invoke('generate-illustrated-story', {
         body: {
@@ -79,23 +84,28 @@ const CreateStory = () => {
         }
       });
 
+      console.log('📡 Edge function response:', { data, error });
+
       if (error) {
+        console.error('❌ Edge function error:', error);
         throw new Error(error.message || 'Failed to create story');
       }
 
-      if (data.success && data.story_id) {
+      if (data?.success && data?.story_id) {
+        console.log('✅ Story created successfully:', data.story_id);
         toast({
           title: "Story Created!",
-          description: `Your personalized story is being generated. This may take a few minutes.`,
+          description: `Your personalized story is being generated with ${data.total_pages || 35} pages.`,
         });
         
         // Navigate to the story reader with the new story ID
         navigate(`/story/${data.story_id}`);
       } else {
-        throw new Error('Failed to create story');
+        console.error('❌ Unexpected response format:', data);
+        throw new Error(data?.error || 'Failed to create story');
       }
     } catch (error) {
-      console.error('Error creating story:', error);
+      console.error('💥 Error creating story:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create story",
