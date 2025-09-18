@@ -17,30 +17,17 @@ serve(async (req) => {
   }
 
   try {
-    console.log('=== STEP 1: Request validation and setup ===');
+    console.log('=== STORY ILLUSTRATION GENERATION START ===');
     
-    const {
-      story_id,
-      child_id,
-      story_pages,
-      child_avatar_url,
-      character_prompt,
-      style_prompt = "colorful cartoon illustration, Pixar-style, storybook art, child-friendly"
-    } = await req.json();
+    const { story_id, child_id } = await req.json();
 
-    console.log('Request data:', {
-      story_id,
-      child_id,
-      pages_count: story_pages?.length,
-      has_avatar: !!child_avatar_url,
-      character_prompt
-    });
+    console.log('Request data:', { story_id, child_id });
 
     // Validate required fields
-    if (!story_id || !child_id || !story_pages || !Array.isArray(story_pages)) {
-      console.error('Missing required fields:', { story_id, child_id, story_pages: !!story_pages });
+    if (!story_id || !child_id) {
+      console.error('Missing required fields:', { story_id, child_id });
       return new Response(JSON.stringify({
-        error: 'Missing required fields: story_id, child_id, or story_pages'
+        error: 'Missing required fields: story_id or child_id'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -58,44 +45,116 @@ serve(async (req) => {
       });
     }
 
-    console.log(`✅ Setup complete. Processing ${story_pages.length} pages for story ${story_id}`);
+    console.log('=== STEP 1: Fetch child and story data ===');
 
-    // Check existing illustrations to avoid regeneration
-    const { data: existing, error: dbError } = await supabase
-      .from('story_illustrations')
-      .select('page_number, image_url, generation_status')
-      .eq('story_id', story_id)
-      .eq('child_id', child_id);
+    // Get child data (including avatar)
+    const { data: childData, error: childError } = await supabase
+      .from('children')
+      .select('name, age, avatar_url')
+      .eq('id', child_id)
+      .single();
 
-    if (dbError) {
-      console.error('Database error checking existing illustrations:', dbError);
+    if (childError || !childData) {
+      console.error('Failed to fetch child data:', childError);
       return new Response(JSON.stringify({
-        error: 'Database error: ' + dbError.message
+        error: 'Child not found or error fetching child data'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Child data:', childData);
+
+    // Validate avatar exists
+    if (!childData.avatar_url) {
+      console.error('Child avatar not found');
+      return new Response(JSON.stringify({
+        error: 'Child avatar not found. Please upload and cartoonify an avatar first.'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Get story data
+    const { data: storyData, error: storyError } = await supabase
+      .from('stories')
+      .select('title, content')
+      .eq('id', story_id)
+      .single();
+
+    if (storyError || !storyData) {
+      console.error('Failed to fetch story data:', storyError);
+      return new Response(JSON.stringify({
+        error: 'Story not found or error fetching story data'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Story data:', { title: storyData.title, content_length: storyData.content?.length });
+
+    // Parse story content into ~35 pages
+    const storyContent = storyData.content || '';
+    const sentences = storyContent.split(/[.!?]+/).filter(s => s.trim().length > 10);
+    const pagesPerSentence = Math.ceil(sentences.length / 35);
+    const storyPages: Array<{ page_number: number; text_content: string }> = [];
+    
+    for (let i = 0; i < Math.min(35, sentences.length); i += pagesPerSentence) {
+      const pageText = sentences.slice(i, i + pagesPerSentence).join('. ').trim();
+      if (pageText) {
+        storyPages.push({
+          page_number: storyPages.length + 1,
+          text_content: pageText
+        });
+      }
+    }
+
+    // Ensure we have exactly 35 pages (pad if necessary)
+    while (storyPages.length < 35 && storyPages.length > 0) {
+      const lastPage = storyPages[storyPages.length - 1];
+      storyPages.push({
+        page_number: storyPages.length + 1,
+        text_content: `${lastPage.text_content} The adventure continues...`
+      });
+    }
+
+    console.log(`Generated ${storyPages.length} story pages`);
+
+    // Check existing pages to avoid regeneration
+    const { data: existingPages, error: existingError } = await supabase
+      .from('story_pages')
+      .select('page_number, image_url, generation_status')
+      .eq('story_id', story_id);
+
+    if (existingError) {
+      console.error('Database error checking existing pages:', existingError);
+      return new Response(JSON.stringify({
+        error: 'Database error: ' + existingError.message
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const existingPages = new Set(existing?.map(img => img.page_number) || []);
+    const existingPageNumbers = new Set(existingPages?.map(p => p.page_number) || []);
     const results: any[] = [];
 
-    console.log(`Found ${existing?.length || 0} existing illustrations`);
+    console.log(`Found ${existingPages?.length || 0} existing pages`);
 
     // Process each page
-    for (let i = 0; i < story_pages.length; i++) {
-      const page = story_pages[i];
-      const page_number = page.page_number || i + 1;
-
-      console.log(`\n=== PROCESSING PAGE ${page_number} ===`);
+    for (const page of storyPages) {
+      console.log(`\n=== PROCESSING PAGE ${page.page_number} ===`);
 
       // Skip if already generated successfully
-      if (existingPages.has(page_number)) {
-        const existingPage = existing?.find(p => p.page_number === page_number);
-        if (existingPage?.generation_status === 'success') {
-          console.log(`Page ${page_number}: Using cached image`);
+      if (existingPageNumbers.has(page.page_number)) {
+        const existingPage = existingPages?.find(p => p.page_number === page.page_number);
+        if (existingPage?.generation_status === 'success' && existingPage.image_url) {
+          console.log(`Page ${page.page_number}: Using cached image`);
           results.push({
-            page_number,
+            page_number: page.page_number,
             status: 'cached',
             image_url: existingPage.image_url
           });
@@ -104,37 +163,38 @@ serve(async (req) => {
       }
 
       try {
-        console.log(`Page ${page_number}: Starting generation process`);
+        console.log(`Page ${page.page_number}: Starting generation process`);
         
-        // Update status to generating
-        const { error: updateError } = await supabase
-          .from('story_illustrations')
+        // Insert or update story page record
+        const { error: upsertError } = await supabase
+          .from('story_pages')
           .upsert({
             story_id,
-            child_id,
-            page_number,
+            page_number: page.page_number,
+            text_content: page.text_content,
             generation_status: 'generating',
-            image_url: '',
-            prompt_used: ''
+            image_url: null
           });
 
-        if (updateError) {
-          console.error(`Page ${page_number}: Database update error:`, updateError);
-          throw new Error('Failed to update generation status: ' + updateError.message);
+        if (upsertError) {
+          console.error(`Page ${page.page_number}: Database upsert error:`, upsertError);
+          throw new Error('Failed to update page status: ' + upsertError.message);
         }
 
-        console.log(`Page ${page_number}: ✅ Updated status to 'generating'`);
+        console.log(`Page ${page.page_number}: ✅ Updated status to 'generating'`);
 
-        // Extract child info for prompt
-        const childAge = character_prompt.match(/(\d+)-year-old/)?.[1] || '6';
-        const childName = character_prompt.split(',')[0] || 'child';
+        // Build DALL-E prompt with avatar character consistency
+        const childName = childData.name || 'child';
+        const childAge = childData.age || 6;
+        const dallePrompt = `A whimsical cartoon-style children's book illustration of ${childName}, a ${childAge}-year-old child, in a scene where: ${page.text_content}. 
 
-        // Build DALL-E prompt
-        const dallePrompt = `A cartoon illustration of ${childName}, a ${childAge}-year-old child, in a scene where: ${page.text}. ${style_prompt}. Consistent character appearance, vibrant colors, detailed background, professional children's book illustration.`;
+Character appearance: The child should look exactly like the cartoon avatar character, with consistent facial features, hair, and clothing style throughout all pages.
 
-        console.log(`Page ${page_number}: Generated prompt:`, dallePrompt);
+Style: Bright, colorful, Pixar-style 2D illustration with professional storybook quality. Vibrant colors, detailed background, friendly and engaging for children. The same artistic style and character design must be maintained across all pages.`;
 
-        console.log(`Page ${page_number}: === STEP 2: Calling OpenAI DALL-E API ===`);
+        console.log(`Page ${page.page_number}: Generated prompt (${dallePrompt.length} chars)`);
+
+        console.log(`Page ${page.page_number}: === STEP 2: Calling OpenAI DALL-E API ===`);
 
         // Generate image with OpenAI DALL-E
         const dalleResponse = await fetch('https://api.openai.com/v1/images/generations', {
@@ -153,44 +213,46 @@ serve(async (req) => {
           }),
         });
 
-        console.log(`Page ${page_number}: OpenAI API response status:`, dalleResponse.status);
+        console.log(`Page ${page.page_number}: OpenAI API response status:`, dalleResponse.status);
 
         if (!dalleResponse.ok) {
           const errorText = await dalleResponse.text();
-          console.error(`Page ${page_number}: OpenAI API error response:`, errorText);
+          console.error(`Page ${page.page_number}: OpenAI API error response:`, errorText);
+          
+          // Handle quota exceeded errors gracefully
+          if (dalleResponse.status === 429 || errorText.includes('billing_hard_limit_reached')) {
+            throw new Error('OpenAI API quota exceeded. Please check your billing and try again later.');
+          }
+          
           throw new Error(`OpenAI API error (${dalleResponse.status}): ${errorText}`);
         }
 
         const dalleData = await dalleResponse.json();
-        console.log(`Page ${page_number}: ✅ OpenAI response received:`, {
-          has_data: !!dalleData,
-          has_images: !!dalleData.data,
-          image_count: dalleData.data?.length
-        });
+        console.log(`Page ${page.page_number}: ✅ OpenAI response received`);
 
         if (!dalleData.data || !dalleData.data[0] || !dalleData.data[0].url) {
-          console.error(`Page ${page_number}: Invalid OpenAI response:`, dalleData);
+          console.error(`Page ${page.page_number}: Invalid OpenAI response:`, dalleData);
           throw new Error('No image URL in OpenAI response');
         }
 
         const generatedImageUrl = dalleData.data[0].url;
-        console.log(`Page ${page_number}: Generated image URL:`, generatedImageUrl);
+        console.log(`Page ${page.page_number}: Generated image URL received`);
 
-        console.log(`Page ${page_number}: === STEP 3: Downloading and uploading image ===`);
+        console.log(`Page ${page.page_number}: === STEP 3: Downloading and uploading image ===`);
 
         // Download the generated image
         const imageResponse = await fetch(generatedImageUrl);
         
         if (!imageResponse.ok) {
-          console.error(`Page ${page_number}: Failed to download image:`, imageResponse.status);
+          console.error(`Page ${page.page_number}: Failed to download image:`, imageResponse.status);
           throw new Error(`Failed to download generated image: ${imageResponse.status}`);
         }
 
         const imageBlob = await imageResponse.blob();
-        console.log(`Page ${page_number}: ✅ Downloaded image (${imageBlob.size} bytes)`);
+        console.log(`Page ${page.page_number}: ✅ Downloaded image (${imageBlob.size} bytes)`);
 
         // Upload to Supabase Storage
-        const fileName = `illustrations/${child_id}/${story_id}/page_${page_number}.png`;
+        const fileName = `story-pages/${child_id}/${story_id}/page_${page.page_number}.png`;
         const { error: uploadError } = await supabase.storage
           .from('StoryVoyagers')
           .upload(fileName, imageBlob, {
@@ -199,11 +261,11 @@ serve(async (req) => {
           });
 
         if (uploadError) {
-          console.error(`Page ${page_number}: Upload error:`, uploadError);
+          console.error(`Page ${page.page_number}: Upload error:`, uploadError);
           throw new Error('Failed to upload image: ' + uploadError.message);
         }
 
-        console.log(`Page ${page_number}: ✅ Uploaded to Supabase Storage: ${fileName}`);
+        console.log(`Page ${page.page_number}: ✅ Uploaded to Supabase Storage: ${fileName}`);
 
         // Get public URL
         const { data: urlData } = supabase.storage
@@ -211,56 +273,52 @@ serve(async (req) => {
           .getPublicUrl(fileName);
 
         const publicUrl = urlData.publicUrl;
-        console.log(`Page ${page_number}: Public URL:`, publicUrl);
+        console.log(`Page ${page.page_number}: Public URL generated`);
 
-        console.log(`Page ${page_number}: === STEP 4: Updating database with success ===`);
+        console.log(`Page ${page.page_number}: === STEP 4: Updating database with success ===`);
 
         // Update with success
         const { error: finalUpdateError } = await supabase
-          .from('story_illustrations')
-          .upsert({
-            story_id,
-            child_id,
-            page_number,
+          .from('story_pages')
+          .update({
             generation_status: 'success',
-            image_url: publicUrl,
-            prompt_used: dallePrompt
-          });
+            image_url: publicUrl
+          })
+          .eq('story_id', story_id)
+          .eq('page_number', page.page_number);
 
         if (finalUpdateError) {
-          console.error(`Page ${page_number}: Final update error:`, finalUpdateError);
+          console.error(`Page ${page.page_number}: Final update error:`, finalUpdateError);
           throw new Error('Failed to update success status: ' + finalUpdateError.message);
         }
 
         results.push({
-          page_number,
+          page_number: page.page_number,
           status: 'generated',
           image_url: publicUrl
         });
 
-        console.log(`Page ${page_number}: ✅ COMPLETED SUCCESSFULLY`);
+        console.log(`Page ${page.page_number}: ✅ COMPLETED SUCCESSFULLY`);
 
       } catch (error) {
-        console.error(`Page ${page_number}: ❌ ERROR:`, error);
+        console.error(`Page ${page.page_number}: ❌ ERROR:`, error);
         
         // Update with error status
         try {
           await supabase
-            .from('story_illustrations')
-            .upsert({
-              story_id,
-              child_id,
-              page_number,
+            .from('story_pages')
+            .update({
               generation_status: 'error',
-              image_url: '',
-              prompt_used: dallePrompt || page.text
-            });
+              image_url: null
+            })
+            .eq('story_id', story_id)
+            .eq('page_number', page.page_number);
         } catch (dbError) {
-          console.error(`Page ${page_number}: Failed to update error status:`, dbError);
+          console.error(`Page ${page.page_number}: Failed to update error status:`, dbError);
         }
 
         results.push({
-          page_number,
+          page_number: page.page_number,
           status: 'error',
           error: (error as Error).message
         });
@@ -270,10 +328,12 @@ serve(async (req) => {
     const response = {
       success: true,
       results,
-      total_pages: story_pages.length,
+      total_pages: storyPages.length,
       generated_count: results.filter(r => r.status === 'generated').length,
       cached_count: results.filter(r => r.status === 'cached').length,
-      error_count: results.filter(r => r.status === 'error').length
+      error_count: results.filter(r => r.status === 'error').length,
+      child_name: childData.name,
+      story_title: storyData.title
     };
 
     console.log('\n=== FINAL SUMMARY ===');

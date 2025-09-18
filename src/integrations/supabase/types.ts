@@ -289,6 +289,39 @@ export type Database = {
         }
         Relationships: []
       }
+      story_pages: {
+        Row: {
+          created_at: string
+          generation_status: string
+          id: string
+          image_url: string | null
+          page_number: number
+          story_id: string
+          text_content: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          generation_status?: string
+          id?: string
+          image_url?: string | null
+          page_number: number
+          story_id: string
+          text_content: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          generation_status?: string
+          id?: string
+          image_url?: string | null
+          page_number?: number
+          story_id?: string
+          text_content?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
