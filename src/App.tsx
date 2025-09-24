@@ -17,6 +17,28 @@ import SignIn from "./pages/SignIn";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import { useEffect, useState } from "react";
+import { useSelectedProfile } from "@/lib/selectedProfile";
+import { ProfilePickerDialog } from "@/components/ProfilePickerDialog";
+import { useSession } from "@/lib/useSession"; // if you have a session hook; otherwise check Supabase auth directly
+
+export default function App() {
+  const { profile, loading } = useSelectedProfile();
+  const { session, loading: authLoading } = useSession(); // or custom check
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && session && !loading && !profile) setOpen(true);
+  }, [authLoading, session, loading, profile]);
+
+  return (
+    <>
+      {/* your routes / layout */}
+      <ProfilePickerDialog open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
 
 // Protected Route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
