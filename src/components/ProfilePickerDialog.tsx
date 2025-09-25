@@ -2,11 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // shadcn
 import { Button } from "@/components/ui/button";
 import { useSelectedProfile } from "@/lib/selectedProfile";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 
-const supabase = createClient(import.meta.env.VITE_SUPABASE_URL!, import.meta.env.VITE_SUPABASE_ANON_KEY!);
-
-type P = { id: string; name: string; avatar_url?: string | null };
+type P = { id: string; full_name: string; avatar_url?: string | null };
 
 export function ProfilePickerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { setProfile } = useSelectedProfile();
@@ -17,7 +15,7 @@ export function ProfilePickerDialog({ open, onOpenChange }: { open: boolean; onO
     if (!open) return;
     (async () => {
       setLoading(true);
-      const { data } = await supabase.from("profiles").select("id,name,avatar_url").order("name", { ascending: true });
+      const { data } = await supabase.from("profiles").select("id,full_name,avatar_url").order("full_name", { ascending: true });
       setProfiles(data ?? []);
       setLoading(false);
     })();
@@ -47,7 +45,7 @@ export function ProfilePickerDialog({ open, onOpenChange }: { open: boolean; onO
               <button
                 key={p.id}
                 onClick={() => {
-                  setProfile(p);
+                  setProfile({ id: p.id, name: p.full_name, avatar_url: p.avatar_url });
                   onOpenChange(false);
                 }}
                 className="flex flex-col items-center gap-2 rounded-2xl border p-4 hover:shadow"
@@ -56,7 +54,7 @@ export function ProfilePickerDialog({ open, onOpenChange }: { open: boolean; onO
                   src={p.avatar_url || "/avatar-placeholder.png"}
                   className="w-24 h-24 rounded-full object-cover border"
                 />
-                <span className="text-sm font-medium">{p.name}</span>
+                <span className="text-sm font-medium">{p.full_name}</span>
               </button>
             ))}
           </div>
