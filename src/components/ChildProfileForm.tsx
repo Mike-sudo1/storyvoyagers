@@ -4,9 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useCreateChild, useUpdateChild, useCartoonifyAvatar, useChildren } from "@/hooks/useChildren";
+import { useCreateChild, useUpdateChild, useChildren } from "@/hooks/useChildren";
+import { useAvatarGeneration } from "@/hooks/useAvatarGeneration";
+import AvatarBuilder, { type AvatarConfig } from "@/components/AvatarBuilder";
 import { toast } from "sonner";
-import { Upload, Loader2, X } from "lucide-react";
+import { Palette, Loader2 } from "lucide-react";
 
 interface ChildProfileFormProps {
   // For dialog-based usage (Profile page)
@@ -29,39 +31,37 @@ const ChildProfileForm = ({
 }: ChildProfileFormProps) => {
   const [name, setName] = useState(child?.name || "");
   const [age, setAge] = useState<number>(child?.age || 6);
-  const [profileImage, setProfileImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>("");
+  const [showAvatarBuilder, setShowAvatarBuilder] = useState(false);
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(child?.avatar_json || null);
+  const [avatarPreview, setAvatarPreview] = useState<string>(child?.avatar_url || "");
   
   const { data: children = [] } = useChildren();
   const createChild = useCreateChild();
   const updateChild = useUpdateChild();
-  const cartoonifyAvatar = useCartoonifyAvatar();
+  const { generateAvatarImage, isGenerating } = useAvatarGeneration();
 
   // Determine if this is dialog mode or inline mode
   const isDialogMode = open !== undefined;
   const actualExistingCount = existingChildrenCount ?? children.length;
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setProfileImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleAvatarSave = async (config: AvatarConfig, previewUrl: string) => {
+    setAvatarConfig(config);
+    setAvatarPreview(previewUrl);
+    setShowAvatarBuilder(false);
+    toast.success("Avatar configuration saved!");
   };
 
-  const removeImage = () => {
-    setProfileImage(null);
-    setImagePreview("");
+  const removeAvatar = () => {
+    setAvatarConfig(null);
+    setAvatarPreview("");
   };
 
   useEffect(() => {
     if (child && isEditing) {
       setName(child.name || "");
       setAge(child.age || 6);
+      setAvatarConfig(child.avatar_json || null);
+      setAvatarPreview(child.avatar_url || "");
     }
   }, [child, isEditing]);
 
@@ -95,8 +95,8 @@ const ChildProfileForm = ({
         handleClose();
       } else {
         // Create new child
-        if (!profileImage) {
-          toast.error("Please upload a profile photo");
+        if (!avatarConfig) {
+          toast.error("Please create an avatar");
           return;
         }
 
@@ -111,14 +111,16 @@ const ChildProfileForm = ({
         });
 
         if (childData.success && childData.child) {
-          // Then cartoonify the avatar
-          await cartoonifyAvatar.mutateAsync({
-            childId: childData.child.id,
-            imageFile: profileImage
-          });
-
-          toast.success("Child profile created and avatar generated!");
-          handleClose();
+          // Generate avatar image using DALL-E
+          const imageUrl = await generateAvatarImage(avatarConfig, childData.child.id, name.trim());
+          
+          if (imageUrl) {
+            toast.success("Child profile created and avatar generated!");
+            handleClose();
+          } else {
+            toast.error("Profile created but avatar generation failed");
+            handleClose();
+          }
         }
       }
     } catch (error) {
@@ -127,7 +129,7 @@ const ChildProfileForm = ({
     }
   };
 
-  const isLoading = createChild.isPending || updateChild.isPending || cartoonifyAvatar.isPending;
+  const isLoading = createChild.isPending || updateChild.isPending || isGenerating;
 
   const renderForm = () => {
     if (!isEditing && actualExistingCount >= 5) {
@@ -183,40 +185,55 @@ const ChildProfileForm = ({
 
             {!isEditing && (
               <div>
-                <Label>Profile Photo</Label>
-                <div className="mt-2">
-                  {imagePreview ? (
-                    <div className="relative inline-block">
-                      <img
-                        src={imagePreview}
-                        alt="Profile preview"
-                        className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={removeImage}
-                        className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                        disabled={isLoading}
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                <Label>Avatar</Label>
+                <div className="mt-2 space-y-3">
+                  {avatarPreview ? (
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <img
+                          src={avatarPreview}
+                          alt="Avatar preview"
+                          className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeAvatar}
+                          className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 text-xs"
+                          disabled={isLoading}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Avatar created!</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowAvatarBuilder(true)}
+                          disabled={isLoading}
+                          className="mt-1"
+                        >
+                          <Palette className="w-3 h-3 mr-1" />
+                          Edit Avatar
+                        </Button>
+                      </div>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-gray-300 rounded-full cursor-pointer hover:border-gray-400">
-                      <Upload className="w-6 h-6 text-gray-400" />
-                      <span className="text-xs text-gray-500 mt-1">Upload</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="hidden"
-                        disabled={isLoading}
-                      />
-                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowAvatarBuilder(true)}
+                      disabled={isLoading}
+                      className="w-full flex items-center justify-center gap-2 h-16 border-2 border-dashed"
+                    >
+                      <Palette className="w-6 h-6 text-primary" />
+                      <span>Create Avatar</span>
+                    </Button>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  This photo will be converted into a cartoon avatar for stories
+                  Design a custom cartoon avatar that will appear in all stories
                 </p>
               </div>
             )}
@@ -233,13 +250,13 @@ const ChildProfileForm = ({
               </Button>
               <Button
                 type="submit"
-                disabled={isLoading || (!isEditing && !profileImage)}
+                disabled={isLoading || (!isEditing && !avatarConfig)}
                 className="flex-1"
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {cartoonifyAvatar.isPending ? "Creating Avatar..." : isEditing ? "Updating..." : "Creating..."}
+                    {isGenerating ? "Creating Avatar..." : isEditing ? "Updating..." : "Creating..."}
                   </>
                 ) : (
                   isEditing ? "Update Profile" : "Create Profile"
@@ -254,20 +271,41 @@ const ChildProfileForm = ({
 
   if (isDialogMode) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {isEditing ? "Edit Child Profile" : "Create Child Profile"}
-            </DialogTitle>
-          </DialogHeader>
-          {renderForm()}
-        </DialogContent>
-      </Dialog>
+      <>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {isEditing ? "Edit Child Profile" : "Create Child Profile"}
+              </DialogTitle>
+            </DialogHeader>
+            {renderForm()}
+          </DialogContent>
+        </Dialog>
+        
+        <AvatarBuilder
+          open={showAvatarBuilder}
+          onOpenChange={setShowAvatarBuilder}
+          childName={name || "Child"}
+          onSave={handleAvatarSave}
+          initialConfig={avatarConfig || undefined}
+        />
+      </>
     );
   }
 
-  return renderForm();
+  return (
+    <>
+      {renderForm()}
+      <AvatarBuilder
+        open={showAvatarBuilder}
+        onOpenChange={setShowAvatarBuilder}
+        childName={name || "Child"}
+        onSave={handleAvatarSave}
+        initialConfig={avatarConfig || undefined}
+      />
+    </>
+  );
 };
 
 export default ChildProfileForm;

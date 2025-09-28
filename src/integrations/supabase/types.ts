@@ -17,6 +17,7 @@ export type Database = {
       children: {
         Row: {
           age: number | null
+          avatar_json: Json | null
           avatar_url: string | null
           badges: number | null
           created_at: string
@@ -33,6 +34,7 @@ export type Database = {
         }
         Insert: {
           age?: number | null
+          avatar_json?: Json | null
           avatar_url?: string | null
           badges?: number | null
           created_at?: string
@@ -49,6 +51,7 @@ export type Database = {
         }
         Update: {
           age?: number | null
+          avatar_json?: Json | null
           avatar_url?: string | null
           badges?: number | null
           created_at?: string
@@ -206,6 +209,7 @@ export type Database = {
           language: string | null
           original_content: string | null
           reading_time: number | null
+          style_prompt: string | null
           subject: string
           template_content: Json | null
           title: string
@@ -226,6 +230,7 @@ export type Database = {
           language?: string | null
           original_content?: string | null
           reading_time?: number | null
+          style_prompt?: string | null
           subject: string
           template_content?: Json | null
           title: string
@@ -246,6 +251,7 @@ export type Database = {
           language?: string | null
           original_content?: string | null
           reading_time?: number | null
+          style_prompt?: string | null
           subject?: string
           template_content?: Json | null
           title?: string
@@ -288,6 +294,67 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      story_page_images: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          generation_status: string
+          id: string
+          image_prompt: string | null
+          image_url: string | null
+          profile_id: string
+          story_id: string
+          story_page_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          generation_status?: string
+          id?: string
+          image_prompt?: string | null
+          image_url?: string | null
+          profile_id: string
+          story_id: string
+          story_page_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          generation_status?: string
+          id?: string
+          image_prompt?: string | null
+          image_url?: string | null
+          profile_id?: string
+          story_id?: string
+          story_page_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_page_images_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_page_images_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_page_images_story_page_id_fkey"
+            columns: ["story_page_id"]
+            isOneToOne: false
+            referencedRelation: "story_pages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       story_pages: {
         Row: {

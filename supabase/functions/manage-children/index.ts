@@ -61,7 +61,7 @@ serve(async (req) => {
 
       case 'POST':
         // Create new child
-        const { name, age, grade, reading_level, interests, language_preference } = body;
+        const { name, age, pronouns, grade, reading_level, interests, language_preference, avatar_json, avatar_url } = body;
 
         if (!name || !age) {
           return new Response(
@@ -93,10 +93,13 @@ serve(async (req) => {
             user_id: user.id,
             name,
             age,
+            pronouns,
             grade,
             reading_level,
             interests: interests || [],
-            language_preference: language_preference || 'en'
+            language_preference: language_preference || 'en',
+            avatar_json,
+            avatar_url
           })
           .select()
           .single();
